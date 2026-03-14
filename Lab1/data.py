@@ -108,38 +108,6 @@ def sample_gmm_2d(K, C, N):
 
     return X, Y_
 
-def graph_surface(function, rect, offset=0.5, width=256, height=256):
-  """Creates a surface plot (visualize with plt.show)
-
-  Arguments:
-    function: surface to be plotted
-    rect:     function domain provided as:
-              ([x_min,y_min], [x_max,y_max])
-    offset:   the level plotted as a contour plot
-
-  Returns:
-    None
-  """
-
-  lsw = np.linspace(rect[0][1], rect[1][1], width) 
-  lsh = np.linspace(rect[0][0], rect[1][0], height)
-  xx0,xx1 = np.meshgrid(lsh, lsw)
-  grid = np.stack((xx0.flatten(),xx1.flatten()), axis=1)
-
-  #get the values and reshape them
-  values=function(grid).reshape((width,height))
-  
-  # fix the range and offset
-  delta = offset if offset else 0
-  maxval=max(np.max(values)-delta, - (np.min(values)-delta))
-  
-  # draw the surface and the offset
-  plt.pcolormesh(xx0, xx1, values, 
-     vmin=delta-maxval, vmax=delta+maxval)
-    
-  if offset != None:
-    plt.contour(xx0, xx1, values, colors='black', levels=[offset])
-
 
 # TEST ________________________
 def dummy(X):
