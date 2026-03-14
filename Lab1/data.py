@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 class Random2DGaussian:
-    def __init__(self, x_min = 0, x_max = 10, y_min = 0, y_max = 10, cov_scale = 0.2):
+    def __init__(self, x_min=0, x_max=10, y_min=0, y_max=10, cov_scale=0.2):
         """
         Parameters:
             x_min, x_max, y_min, y_max - range where mean can be placed
@@ -38,7 +38,7 @@ class Random2DGaussian:
 
         return np.random.multivariate_normal(self.mean, self.covariance_matrix, n)
 
-def graph_data_2D(X, Y_, Y, special=[]):
+def graph_data(X, Y_, Y, special=[]):
     """
     Point colors represent true classes.
     Circle points represent correct guesses.
@@ -64,6 +64,27 @@ def graph_data_2D(X, Y_, Y, special=[]):
     incorrect = (Y != Y_)
     plt.scatter(X[incorrect, 0], X[incorrect, 1], c=colors[incorrect], s=sizes[incorrect], marker='s', edgecolors='black')
 
+def graph_surface(fun, rect, offset=0.5, width=256, height=256):
+    """
+    Parameters:
+        fun - decision function
+        rect - domain ([x_min, y_min], [x_max, y_max])
+        offset - color palette offset
+        width, height - resolution
+    """
+
+    lin_x = np.linspace(rect[0][0], rect[1][0], width)
+    lin_y = np.linspace(rect[0][1], rect[1][1], height)
+    xx, yy = np.meshgrid(lin_x, lin_y)
+    grid = np.column_stack((xx.flatten(), yy.flatten()))
+
+    values = fun(grid).reshape(height, width)
+    maxval = max(np.max(values) - offset, offset - np.min(values))
+
+    plt.pcolormesh(xx, yy, values, vmin=offset - maxval, vmax=offset + maxval)
+    
+    plt.contour(xx, yy, values, colors='black', levels=[offset])
+
 def sample_gmm_2d(K, C, N):
     """
     Parameters:
@@ -87,7 +108,62 @@ def sample_gmm_2d(K, C, N):
 
     return X, Y_
 
-X, Y_ = sample_gmm_2d(5, 3, 25)
-Y = np.random.randint(0, 3, 5 * 25)
-graph_data_2D(X, Y_, Y)
+def graph_surface(function, rect, offset=0.5, width=256, height=256):
+  """Creates a surface plot (visualize with plt.show)
+
+  Arguments:
+    function: surface to be plotted
+    rect:     function domain provided as:
+              ([x_min,y_min], [x_max,y_max])
+    offset:   the level plotted as a contour plot
+
+  Returns:
+    None
+  """
+
+  lsw = np.linspace(rect[0][1], rect[1][1], width) 
+  lsh = np.linspace(rect[0][0], rect[1][0], height)
+  xx0,xx1 = np.meshgrid(lsh, lsw)
+  grid = np.stack((xx0.flatten(),xx1.flatten()), axis=1)
+
+  #get the values and reshape them
+  values=function(grid).reshape((width,height))
+  
+  # fix the range and offset
+  delta = offset if offset else 0
+  maxval=max(np.max(values)-delta, - (np.min(values)-delta))
+  
+  # draw the surface and the offset
+  plt.pcolormesh(xx0, xx1, values, 
+     vmin=delta-maxval, vmax=delta+maxval)
+    
+  if offset != None:
+    plt.contour(xx0, xx1, values, colors='black', levels=[offset])
+
+
+# TEST ________________________
+def dummy(X):
+    np.random.seed(100)
+    return np.random.randint(0, 3, 5 * 25)
+
+def myDummyDecision(X):
+  scores = X[:,0] + X[:,1] - 5
+  return scores
+
+np.random.seed(100)
+
+# get data
+X,Y_ = sample_gmm_2d(4, 2, 30)
+# X,Y_ = sample_gauss_2d(2, 100)
+
+# get the class predictions
+Y = myDummyDecision(X)>0.5  
+
+# graph the decision surface
+rect=(np.min(X, axis=0), np.max(X, axis=0))
+graph_surface(myDummyDecision, rect)
+
+# graph the data points
+graph_data(X, Y_, Y, special=[])
+
 plt.show()
