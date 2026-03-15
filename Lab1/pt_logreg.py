@@ -52,6 +52,7 @@ class PTLogreg(nn.Module):
 def train(model, X, Yoh_, reg_coe=0.0, lr=0.01, steps=10000, print_step=500):
     """
     Parameters:
+        model
         X - data
         Yoh_ - one-hot encoded true classes
         reg_coe - regularization coefficient
