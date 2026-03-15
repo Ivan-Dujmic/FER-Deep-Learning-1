@@ -50,10 +50,19 @@ def graph_data(X, Y_, Y, special=[]):
         Y - predicted classes
         special - emphasize points
     """
+    colors_list = np.array([
+        "#ff0000",
+        "#00ff00",
+        "#0000ff",
+        "#ffff00",
+        "#00ffff",
+        "#ff00ff",
+        "#ffffff",
+        "#000000"
+    ])
 
     num_classes = np.max(Y_) + 1
-    color_map = matplotlib.colormaps['tab20'].resampled(num_classes)
-    colors = color_map(Y_)[:, :3]
+    colors = colors_list[Y_ % len(colors_list)]
 
     sizes = np.repeat(30, len(Y_))
     sizes[special] = 60
@@ -108,30 +117,30 @@ def sample_gmm_2d(K, C, N):
 
     return X, Y_
 
+if __name__=="__main__":
+    # TEST ________________________
+    def dummy(X):
+        np.random.seed(100)
+        return np.random.randint(0, 3, 5 * 25)
 
-# TEST ________________________
-def dummy(X):
+    def myDummyDecision(X):
+        scores = X[:,0] + X[:,1] - 5
+        return scores
+
     np.random.seed(100)
-    return np.random.randint(0, 3, 5 * 25)
 
-def myDummyDecision(X):
-  scores = X[:,0] + X[:,1] - 5
-  return scores
+    # get data
+    X,Y_ = sample_gmm_2d(4, 2, 30)
+    # X,Y_ = sample_gauss_2d(2, 100)
 
-np.random.seed(100)
+    # get the class predictions
+    Y = myDummyDecision(X)>0.5  
 
-# get data
-X,Y_ = sample_gmm_2d(4, 2, 30)
-# X,Y_ = sample_gauss_2d(2, 100)
+    # graph the decision surface
+    rect=(np.min(X, axis=0), np.max(X, axis=0))
+    graph_surface(myDummyDecision, rect, 0.5)
 
-# get the class predictions
-Y = myDummyDecision(X)>0.5  
+    # graph the data points
+    graph_data(X, Y_, Y, special=[])
 
-# graph the decision surface
-rect=(np.min(X, axis=0), np.max(X, axis=0))
-graph_surface(myDummyDecision, rect)
-
-# graph the data points
-graph_data(X, Y_, Y, special=[])
-
-plt.show()
+    plt.show()
