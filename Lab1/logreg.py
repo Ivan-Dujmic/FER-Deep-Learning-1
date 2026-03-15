@@ -1,5 +1,5 @@
 import numpy as np
-from data import sample_gmm_2d, graph_surface, graph_data
+import data
 import matplotlib.pyplot as plt
 
 class Logreg:
@@ -10,7 +10,7 @@ class Logreg:
             Y_ - true classes
             lr - learning rate
             steps - iterations
-            print_step - print loss every # of steps
+            print_step - print loss every # of steps; 0 for no print
         """
         n_samples, n_features = X.shape
         n_classes = np.max(Y_) + 1
@@ -103,16 +103,16 @@ def classify_wrapper(model):
 if __name__=="__main__":
     np.random.seed(100)
 
-    X,Y_ = sample_gmm_2d(3, 3, 50)
+    X,Y_ = data.sample_gmm_2d(3, 3, 50)
 
     model = Logreg()
     model.train(X, Y_)
     probs = model.classify(X)
     Y = np.argmax(probs, axis=1)
 
-    rect=(np.min(X, axis=0), np.max(X, axis=0))
-    graph_surface(classify_wrapper(model), rect, 0.5)
+    rect = (np.min(X, axis=0), np.max(X, axis=0))
+    data.graph_surface(classify_wrapper(model), rect, 0.5)
 
-    graph_data(X, Y_, Y, special=[])
+    data.graph_data(X, Y_, Y, special=[])
 
     plt.show()

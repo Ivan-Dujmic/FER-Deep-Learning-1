@@ -10,7 +10,7 @@ class PTLinreg:
             Y_ - true classes
             lr - learning rate
             steps - iterations
-            print_step - print loss every # of steps
+            print_step - print loss every # of steps; 0 for no print
             manual_grad - calculate grad without pytorch and print it
         """
         a = torch.randn(1, requires_grad=True)

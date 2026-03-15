@@ -1,5 +1,5 @@
 import numpy as np
-from data import sample_gmm_2d, graph_surface, graph_data
+import data
 import matplotlib.pyplot as plt
 
 class FCANN2:
@@ -10,8 +10,9 @@ class FCANN2:
             Y_ - true classes
             n_hidden - # of neurons in the hidden layer
             lr - learning rate
+            reg_coe - regularization coefficient
             steps - iterations
-            print_step - print loss every # of steps
+            print_step - print loss every # of steps; 0 for no print
         """
         
         n_classes = np.max(Y_) + 1
@@ -82,15 +83,15 @@ class FCANN2:
 if __name__=="__main__":
     np.random.seed(100)
 
-    X, Y_ = sample_gmm_2d(6, 2, 10)
+    X, Y_ = data.sample_gmm_2d(6, 2, 10)
 
     model = FCANN2()
     model.train(X, Y_)
     Y = model.classify(X)
 
-    rect=(np.min(X, axis=0), np.max(X, axis=0))
-    graph_surface(model.classify, rect, 0.5)
+    rect = (np.min(X, axis=0), np.max(X, axis=0))
+    data.graph_surface(model.classify, rect, 0.5)
 
-    graph_data(X, Y_, Y, special=[])
+    data.graph_data(X, Y_, Y, special=[])
 
     plt.show()

@@ -93,16 +93,21 @@ def graph_surface(fun, rect, offset=0.5, width=256, height=256):
     
     plt.contour(xx, yy, values, colors='black', levels=[offset])
 
-def sample_gmm_2d(K, C, N):
+def sample_gmm_2d(K, C, N, parts=1):
     """
     Parameters:
         K - # of distributions
         C - # of classes
         N - # of samples per distribution
+        parts - split into multiple sets (useful for train + test sets)
 
     Returns:
         X - data
         Y_ - classes
+
+        or
+
+        data_parts - parts # of pairs of X and Y_
     """
 
     Gs = []
@@ -111,10 +116,21 @@ def sample_gmm_2d(K, C, N):
         Gs.append(Random2DGaussian())
         Ys.append(np.random.randint(C))
 
-    X = np.vstack([G.get_sample(N) for G in Gs])
-    Y_ = np.hstack([[Y] * N for Y in Ys])
+    X_samples = [G.get_sample(N * parts) for G in Gs]
+    Y_samples = [[Y] * (N * parts) for Y in Ys]
 
-    return X, Y_
+    if parts == 1:
+        X = np.vstack(X_samples)
+        Y_ = np.hstack(Y_samples)
+        return X, Y_
+    
+    else:
+        data_parts = []
+        for p in range(parts):
+            X_part = np.vstack([X[p * N : (p + 1) * N] for X in X_samples])
+            Y_part = np.hstack([Y[p * N : (p + 1) * N] for Y in Y_samples])
+            data_parts.append((X_part, Y_part))
+        return data_parts
 
 if __name__=="__main__":
     def myDummyDecision(X):
@@ -127,7 +143,7 @@ if __name__=="__main__":
 
     Y = myDummyDecision(X)>0.5  
 
-    rect=(np.min(X, axis=0), np.max(X, axis=0))
+    rect = (np.min(X, axis=0), np.max(X, axis=0))
     graph_surface(myDummyDecision, rect, offset=0)
 
     graph_data(X, Y_, Y, special=[])
