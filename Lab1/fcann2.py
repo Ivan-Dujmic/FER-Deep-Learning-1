@@ -3,7 +3,7 @@ from data import sample_gmm_2d, graph_surface, graph_data
 import matplotlib.pyplot as plt
 
 class fcann2:
-    def train(self, X, Y_, n_hidden=5, lr=0.05, reg_coe=0.001, steps=10000):
+    def train(self, X, Y_, n_hidden=5, lr=0.05, reg_coe=0.001, steps=10000, print_step=500):
         """
         Parameters:
             X - data
@@ -11,10 +11,7 @@ class fcann2:
             n_hidden - # of neurons in the hidden layer
             lr - learning rate
             steps - iterations
-
-        Returns:
-            W - weights
-            b - biases
+            print_step - print loss every # of steps
         """
         
         n_classes = np.max(Y_) + 1
@@ -27,14 +24,16 @@ class fcann2:
         W2 = 0.01 * np.random.randn(n_hidden, n_classes)
         b2 = np.zeros(n_classes)
 
-        for _ in range(steps):
+        for i in range(steps):
             s1 = X @ W1 + b1
             h1 = np.maximum(0, s1)
             s2 = h1 @ W2 + b2
             exps = np.exp(s2)
             pp = exps / np.sum(exps, axis=1, keepdims=True)
 
-            # loss = -np.mean(np.log(pp[np.arange(n_samples), Y_])) + reg_coe * (np.sum(W1**2) + np.sum(W2**2))
+            if print_step != 0 and i % print_step == 0:
+                loss = -np.mean(np.log(pp[np.arange(n_samples), Y_])) + reg_coe * (np.sum(W1**2) + np.sum(W2**2))
+                print(f"step: {i}, loss: {loss}")
 
             Gs2 = pp
             Gs2[np.arange(n_samples), Y_] -= 1
@@ -51,6 +50,16 @@ class fcann2:
             W2 -= lr * GW2
             b2 -= lr * Gb2
 
+        if print_step != 0:
+            s1 = X @ W1 + b1
+            h1 = np.maximum(0, s1)
+            s2 = h1 @ W2 + b2
+            exps = np.exp(s2)
+            pp = exps / np.sum(exps, axis=1, keepdims=True)
+
+            loss = -np.mean(np.log(pp[np.arange(n_samples), Y_])) + reg_coe * (np.sum(W1**2) + np.sum(W2**2))
+            print(f"final: {i}, loss: {loss}")
+
         W = [W1, W2]
         b = [b1, b2]
 
@@ -61,8 +70,6 @@ class fcann2:
         """
         Parameters:
             X - data
-            W - weights
-            b - biases
 
         Returns:
             class_probs - each row contains the probabilities of classifying a point into each class
@@ -78,12 +85,12 @@ if __name__=="__main__":
 
     X,Y_ = sample_gmm_2d(6, 2, 10)
 
-    f = fcann2()
-    f.train(X, Y_)
-    Y = f.classify(X)
+    model = fcann2()
+    model.train(X, Y_)
+    Y = model.classify(X)
 
     rect=(np.min(X, axis=0), np.max(X, axis=0))
-    graph_surface(f.classify, rect, 0.5)
+    graph_surface(model.classify, rect, 0.5)
 
     graph_data(X, Y_, Y, special=[])
 
