@@ -3,7 +3,7 @@ from data import sample_gmm_2d, graph_surface, graph_data
 import matplotlib.pyplot as plt
 
 class fcann2:
-    def train(self, X, Y_, n_hidden=10, lr=0.01, steps=10000):
+    def train(self, X, Y_, n_hidden=5, lr=0.05, reg_coe=0.001, steps=10000):
         """
         Parameters:
             X - data
@@ -27,23 +27,23 @@ class fcann2:
         W2 = 0.01 * np.random.randn(n_hidden, n_classes)
         b2 = np.zeros(n_classes)
 
-        for i in range(steps):
+        for _ in range(steps):
             s1 = X @ W1 + b1
             h1 = np.maximum(0, s1)
             s2 = h1 @ W2 + b2
             exps = np.exp(s2)
             pp = exps / np.sum(exps, axis=1, keepdims=True)
 
-            loss = -np.mean(np.log(pp[np.arange(n_samples), Y_]))
+            # loss = -np.mean(np.log(pp[np.arange(n_samples), Y_])) + reg_coe * (np.sum(W1**2) + np.sum(W2**2))
 
             Gs2 = pp
             Gs2[np.arange(n_samples), Y_] -= 1
             Gs2 /= n_samples
-            GW2 = h1.T @ Gs2
+            GW2 = h1.T @ Gs2 + 2 * reg_coe * W2
             Gb2 = np.sum(Gs2, axis=0)
             Gh1 = Gs2 @ W2.T
             Gh1[s1 <= 0] = 0
-            GW1 = X.T @ Gh1
+            GW1 = X.T @ Gh1 + 2 * reg_coe * W1
             Gb1 = np.sum(Gh1, axis=0)
 
             W1 -= lr * GW1
@@ -56,7 +56,6 @@ class fcann2:
 
         self.W = W
         self.b = b
-            
 
     def classify(self, X):
         """
@@ -78,8 +77,7 @@ class fcann2:
 np.random.seed(100)
 
 # get data
-X,Y_ = sample_gmm_2d(4, 2, 30)
-# X,Y_ = sample_gauss_2d(2, 100)
+X,Y_ = sample_gmm_2d(6, 2, 10)
 
 # get the class predictions
 f = fcann2()
