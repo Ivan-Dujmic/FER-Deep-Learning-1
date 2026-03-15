@@ -118,29 +118,19 @@ def sample_gmm_2d(K, C, N):
     return X, Y_
 
 if __name__=="__main__":
-    # TEST ________________________
-    def dummy(X):
-        np.random.seed(100)
-        return np.random.randint(0, 3, 5 * 25)
-
     def myDummyDecision(X):
         scores = X[:,0] + X[:,1] - 5
         return scores
 
     np.random.seed(100)
 
-    # get data
     X,Y_ = sample_gmm_2d(4, 2, 30)
-    # X,Y_ = sample_gauss_2d(2, 100)
 
-    # get the class predictions
     Y = myDummyDecision(X)>0.5  
 
-    # graph the decision surface
     rect=(np.min(X, axis=0), np.max(X, axis=0))
-    graph_surface(myDummyDecision, rect, 0.5)
+    graph_surface(myDummyDecision, rect, offset=0)
 
-    # graph the data points
     graph_data(X, Y_, Y, special=[])
 
     plt.show()

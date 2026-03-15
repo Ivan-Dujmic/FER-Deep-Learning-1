@@ -73,22 +73,18 @@ class fcann2:
         s2 = h1 @ self.W[1] + self.b[1]
         return np.argmax(s2, axis=1)
 
-# TEST ________________________
-np.random.seed(100)
+if __name__=="__main__":
+    np.random.seed(100)
 
-# get data
-X,Y_ = sample_gmm_2d(6, 2, 10)
+    X,Y_ = sample_gmm_2d(6, 2, 10)
 
-# get the class predictions
-f = fcann2()
-f.train(X, Y_)
-Y = f.classify(X)
+    f = fcann2()
+    f.train(X, Y_)
+    Y = f.classify(X)
 
-# graph the decision surface
-rect=(np.min(X, axis=0), np.max(X, axis=0))
-graph_surface(f.classify, rect, 0.5)
+    rect=(np.min(X, axis=0), np.max(X, axis=0))
+    graph_surface(f.classify, rect, 0.5)
 
-# graph the data points
-graph_data(X, Y_, Y, special=[])
+    graph_data(X, Y_, Y, special=[])
 
-plt.show()
+    plt.show()
