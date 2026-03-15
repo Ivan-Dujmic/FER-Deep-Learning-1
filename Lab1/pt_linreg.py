@@ -1,11 +1,18 @@
 import torch
-import torch.nn as nn
 import torch.optim as optim
-import numpy as np
 import matplotlib.pyplot as plt
 
-class pt_linreg:
+class PTLinreg:
     def train(self, X, Y_, lr=0.1, steps=1000, print_step=50, manual_grad=False):
+        """
+        Parameters:
+            X - data
+            Y_ - true classes
+            lr - learning rate
+            steps - iterations
+            print_step - print loss every # of steps
+            manual_grad - calculate grad without pytorch and print it
+        """
         a = torch.randn(1, requires_grad=True)
         b = torch.randn(1, requires_grad=True)
 
@@ -34,27 +41,30 @@ class pt_linreg:
             if manual_grad:
                 grad_a = -2 * torch.sum(X * (Y_ - (a * X + b)))
                 grad_b = -2 * torch.sum(Y_ - (a * X + b))
-                print(f"final: {i}, loss: {loss:.4f}, a: {a.item():.4f}, b: {b.item():.4f}, grad_a: {a.grad.item():.4f}, man_grad_a: {grad_a.item():.4f}, grad_b: {b.grad.item():.4f}, man_grad_b: {grad_b.item():.4f}")
+                print(f"FINAL: loss: {loss:.4f}, a: {a.item():.4f}, b: {b.item():.4f}, grad_a: {a.grad.item():.4f}, man_grad_a: {grad_a.item():.4f}, grad_b: {b.grad.item():.4f}, man_grad_b: {grad_b.item():.4f}")
             else:
-                print(f"final: {i}, loss: {loss:.4f}, a: {a.item():.4f}, b: {b.item():.4f}, grad_a: {a.grad.item():.4f}, grad_b: {b.grad.item():.4f}")
+                print(f"FINAL: loss: {loss:.4f}, a: {a.item():.4f}, b: {b.item():.4f}, grad_a: {a.grad.item():.4f}, grad_b: {b.grad.item():.4f}")
         
         self.a = a
         self.b = b
             
     def predict(self, X):
+        """
+        Parameters:
+            X - data
+
+        Returns: predictions
+        """
         return (self.a * X + self.b).detach().numpy()
 
 if __name__=="__main__":
     a = -0.25
     b = 1.5
     spread = 10
-    X = np.random.rand(50) * 10
-    Y_ = a * (X + (np.random.rand(50) - 0.5) * spread) + b
+    X = torch.rand(50) * 10
+    Y_ = a * (X + (torch.rand(50) - 0.5) * spread) + b
 
-    X = torch.tensor(X, dtype=torch.float32)
-    Y_ = torch.tensor(Y_, dtype=torch.float32)
-
-    model = pt_linreg()
+    model = PTLinreg()
     model.train(X, Y_, 0.0001, manual_grad=True)
 
     x_line = torch.linspace(X.min().item(), X.max().item(), 100)

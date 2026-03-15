@@ -2,7 +2,7 @@ import numpy as np
 from data import sample_gmm_2d, graph_surface, graph_data
 import matplotlib.pyplot as plt
 
-class fcann2:
+class FCANN2:
     def train(self, X, Y_, n_hidden=5, lr=0.05, reg_coe=0.001, steps=10000, print_step=500):
         """
         Parameters:
@@ -58,7 +58,7 @@ class fcann2:
             pp = exps / np.sum(exps, axis=1, keepdims=True)
 
             loss = -np.mean(np.log(pp[np.arange(n_samples), Y_])) + reg_coe * (np.sum(W1**2) + np.sum(W2**2))
-            print(f"final: {i}, loss: {loss}")
+            print(f"FINAL: loss: {loss}")
 
         W = [W1, W2]
         b = [b1, b2]
@@ -71,8 +71,7 @@ class fcann2:
         Parameters:
             X - data
 
-        Returns:
-            class_probs - each row contains the probabilities of classifying a point into each class
+        Returns: class probabilities matrix - each row contains the probabilities of classifying a point into each class
         """
 
         s1 = X @ self.W[0] + self.b[0]
@@ -83,9 +82,9 @@ class fcann2:
 if __name__=="__main__":
     np.random.seed(100)
 
-    X,Y_ = sample_gmm_2d(6, 2, 10)
+    X, Y_ = sample_gmm_2d(6, 2, 10)
 
-    model = fcann2()
+    model = FCANN2()
     model.train(X, Y_)
     Y = model.classify(X)
 

@@ -32,8 +32,7 @@ class Random2DGaussian:
         Parameters:
             n - # of samples
 
-        Returns:
-            data points
+        Returns: data points
         """
 
         return np.random.multivariate_normal(self.mean, self.covariance_matrix, n)
