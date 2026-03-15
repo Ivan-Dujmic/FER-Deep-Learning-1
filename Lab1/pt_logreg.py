@@ -31,11 +31,14 @@ class PTLogreg(nn.Module):
         probs = torch.softmax(scores, dim=1)
         return probs
 
-    def get_loss(self, X, Yoh_, reg_coe):
+    def get_loss(self, X, Yoh_, reg_coe=0.0):
         """
         Parameters:
             X - data
             Yoh_ - one-hot encoded true classes
+            reg_coe - regularization coefficient
+
+        Returns: loss
         """
         
         probs = self.forward(X)
