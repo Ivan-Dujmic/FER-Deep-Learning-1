@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib
 
 class Random2DGaussian:
     def __init__(self, x_min=0, x_max=10, y_min=0, y_max=10, cov_scale=0.2):
@@ -60,7 +59,6 @@ def graph_data(X, Y_, Y, special=[]):
         "#000000"
     ])
 
-    num_classes = np.max(Y_) + 1
     colors = colors_list[Y_ % len(colors_list)]
 
     sizes = np.repeat(30, len(Y_))
@@ -139,13 +137,13 @@ if __name__=="__main__":
 
     np.random.seed(100)
 
-    X,Y_ = sample_gmm_2d(4, 2, 30)
+    X, Y_ = sample_gmm_2d(4, 2, 30)
 
-    Y = myDummyDecision(X)>0.5  
+    Y = myDummyDecision(X) > 0.5  
 
     rect = (np.min(X, axis=0), np.max(X, axis=0))
     graph_surface(myDummyDecision, rect, offset=0)
 
-    graph_data(X, Y_, Y, special=[])
+    graph_data(X, Y_, Y)
 
     plt.show()

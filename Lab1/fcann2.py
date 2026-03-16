@@ -78,7 +78,9 @@ class FCANN2:
         s1 = X @ self.W[0] + self.b[0]
         h1 = np.maximum(0, s1)
         s2 = h1 @ self.W[1] + self.b[1]
-        return np.argmax(s2, axis=1)
+        exps = np.exp(s2 - np.max(s2, axis=1, keepdims=True))
+        probs = exps / np.sum(exps, axis=1, keepdims=True)
+        return probs
 
 if __name__=="__main__":
     np.random.seed(100)
@@ -87,10 +89,10 @@ if __name__=="__main__":
 
     model = FCANN2()
     model.train(X, Y_)
-    Y = model.classify(X)
+    Y = np.argmax(model.classify(X), axis=1)
 
     rect = (np.min(X, axis=0), np.max(X, axis=0))
-    data.graph_surface(model.classify, rect, 0.5)
+    data.graph_surface(lambda X: model.classify(X)[:, 1], rect, 0.5)
 
     data.graph_data(X, Y_, Y, special=[])
 
