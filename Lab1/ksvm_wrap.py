@@ -56,7 +56,10 @@ if __name__=="__main__":
     Y = model.predict(X)
     
     accuracy, _, precisions, recalls = data.eval_perf_multi(Y, Y_)
-    avg_precision = average_precision_score(Y_, model.get_scores(X)[:,1])
+    scores = model.get_scores(X)[:, 1]
+    sorted_idx = np.argsort(scores)[::-1]
+    ranked = (Y_[sorted_idx] == 1).astype(int)
+    avg_precision = data.average_precision(ranked)
     print(f"accuracy: {accuracy}")
     print(f"recalls: {recalls}")
     print(f"precisions: {precisions}")

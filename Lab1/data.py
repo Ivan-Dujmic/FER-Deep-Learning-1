@@ -165,6 +165,34 @@ def eval_perf_multi(Y, Y_):
 
     return accuracy, conf, precision, recall
 
+def average_precision(ranked_labels):
+    """
+    Returns: Average precision from ranked labels
+    """
+    n = len(ranked_labels)
+    pos = sum(ranked_labels)
+    neg = n - pos
+
+    tp = pos
+    tn = 0
+    fn = 0
+    fp = neg
+
+    sumprec=0
+    
+    for x in ranked_labels:
+        precision = tp / (tp + fp) 
+
+        if x:
+            sumprec += precision
+
+        tp -= x
+        fn += x
+        fp -= not x
+        tn += not x
+
+    return sumprec / pos
+
 if __name__=="__main__":
     def myDummyDecision(X):
         scores = X[:,0] + X[:,1] - 5
