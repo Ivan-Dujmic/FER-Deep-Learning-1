@@ -9,11 +9,11 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.svm import SVC
 
 experiments = []
-# experiments.append("regularization")
-# experiments.append("config")
-# experiments.append("adam")
+experiments.append("regularization")
+experiments.append("config")
+experiments.append("adam")
 experiments.append("scheduler")
-# experiments.append("svm")
+experiments.append("svm")
 
 def train_mb(model, optimizer, x, y, x_val, y_val, reg_coe, epochs, batch_size, scheduler=None):
     n_samples = x.shape[0]
