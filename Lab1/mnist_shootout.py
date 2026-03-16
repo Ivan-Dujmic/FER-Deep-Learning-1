@@ -9,10 +9,10 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.svm import SVC
 
 experiments = []
-experiments.append("regularization")
+# experiments.append("regularization")
 # experiments.append("config")
 # experiments.append("adam")
-# experiments.append("scheduler")
+experiments.append("scheduler")
 # experiments.append("svm")
 
 def train_mb(model, optimizer, x, y, x_val, y_val, reg_coe, epochs, batch_size, scheduler=None):
@@ -93,8 +93,30 @@ y_tr = yoh_train[train_idx]
 x_val = x_train[val_idx]
 y_val = yoh_train[val_idx]
 
-def plot_results(results):
-    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+configs = [
+    [784, 10],
+    [784, 100, 10],
+    [784, 100, 100, 10],
+    [784, 100, 100, 100, 10]
+]
+
+def test(optimizer_class, lr, reg_coe, epochs, batch_size, scheduler_class=None):
+    results = {}
+
+    print()
+    for config in configs:
+        model = pt_deep.PTDeep(config)
+        optimizer = optimizer_class(model.parameters(), lr=lr)
+        scheduler = None
+        if scheduler_class:
+            scheduler = scheduler_class(optimizer, gamma=1 - 1e-4)
+        model, losses_train, losses_val = train_mb(model, optimizer, x_tr, y_tr, x_val, y_val, reg_coe, epochs, batch_size, scheduler)
+        results[str(config)] = (losses_train, losses_val)
+
+        acc, prec, rec = eval(model, x_test, y_test)
+        print(f"config {config}:\nacc: {acc:.4f}\nprec: {prec:.4f}\nrec: {rec:.4f}\n")
+
+    _, axes = plt.subplots(2, 2, figsize=(10, 8))
 
     axes = axes.flatten()
 
@@ -138,58 +160,14 @@ if "regularization" in experiments:
         plt.tight_layout()
         plt.show()
 
-configs = [
-        [784, 10],
-        [784, 100, 10],
-        [784, 100, 100, 10],
-        [784, 100, 100, 100, 10]
-    ]
-
 if "config" in experiments:
-    results = {}
-
-    print()
-    for config in configs:
-        model = pt_deep.PTDeep(config)
-        optimizer = torch.optim.SGD(model.parameters(), lr=0.05)
-        model, losses_train, losses_val = train_mb(model, optimizer, x_tr, y_tr, x_val, y_val, 0, 30, 256)
-        results[str(config)] = (losses_train, losses_val)
-
-        acc, prec, rec = eval(model, x_test, y_test)
-        print(f"config {config}:\nacc: {acc:.4f}\nprec: {prec:.4f}\nrec: {rec:.4f}\n")
-
-    plot_results(results)
+    test(torch.optim.SGD, 0.05, 0, 30, 256)
 
 if "adam" in experiments:
-    results = {}
-
-    print()
-    for config in configs:
-        model = pt_deep.PTDeep(config)
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-        model, losses_train, losses_val = train_mb(model, optimizer, x_tr, y_tr, x_val, y_val, 0, 30, 256)
-        results[str(config)] = (losses_train, losses_val)
-
-        acc, prec, rec = eval(model, x_test, y_test)
-        print(f"config {config}:\nacc: {acc:.4f}\nprec: {prec:.4f}\nrec: {rec:.4f}\n")
-
-    plot_results(results)
+    test(torch.optim.Adam, 1e-4, 0, 30, 256)
 
 if "scheduler" in experiments:
-    results = {}
-
-    print()
-    for config in configs:
-        model = pt_deep.PTDeep(config)
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=1 - 1e-4)
-        model, losses_train, losses_val = train_mb(model, optimizer, x_tr, y_tr, x_val, y_val, 0, 30, 256, scheduler)
-        results[str(config)] = (losses_train, losses_val)
-
-        acc, prec, rec = eval(model, x_test, y_test)
-        print(f"config {config}:\nacc: {acc:.4f}\nprec: {prec:.4f}\nrec: {rec:.4f}\n")
-
-    plot_results(results)
+    test(torch.optim.Adam, 1e-4, 0, 30, 256, torch.optim.lr_scheduler.ExponentialLR)
 
 if "svm" in experiments:
     models = [SVC(kernel='linear'), SVC(kernel='rbf')]

@@ -85,7 +85,7 @@ if __name__=="__main__":
         47
     ]
 
-    fig, axs = plt.subplots(3, 4, figsize=(15, 15))
+    _, axs = plt.subplots(3, 4, figsize=(15, 15))
     axs = axs.flatten()
     index = 0
 

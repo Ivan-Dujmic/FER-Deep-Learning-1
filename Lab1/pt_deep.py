@@ -80,7 +80,7 @@ if __name__=="__main__":
     model_params = [[2, 2], [2, 10, 2], [2, 10, 10, 2]]
     acts = [torch.relu, torch.sigmoid]
 
-    fig, axs = plt.subplots(3, 4, figsize=(15, 15))
+    _, axs = plt.subplots(3, 4, figsize=(15, 15))
     axs = axs.flatten()
     index = 0
 

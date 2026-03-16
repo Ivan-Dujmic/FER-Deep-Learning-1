@@ -127,7 +127,7 @@ if __name__=="__main__":
 
     reg_coe = 1e-5
 
-    fig, axs = plt.subplots(2, 3, figsize=(15, 10))
+    _, axs = plt.subplots(2, 3, figsize=(15, 10))
     axs = axs.flatten()
 
     # Logreg train
