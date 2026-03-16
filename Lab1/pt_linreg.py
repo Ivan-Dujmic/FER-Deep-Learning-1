@@ -21,12 +21,12 @@ class PTLinreg:
         for i in range(steps):
             Y = a * X + b
             diff = Y_ - Y
-            loss = torch.sum(diff ** 2)
+            loss = torch.mean(diff ** 2)
             loss.backward()
             if print_step != 0 and i % print_step == 0:
                 if manual_grad:
-                    grad_a = -2 * torch.sum(X * (Y_ - (a * X + b)))
-                    grad_b = -2 * torch.sum(Y_ - (a * X + b))
+                    grad_a = -2 * torch.mean(X * (Y_ - (a * X + b)))
+                    grad_b = -2 * torch.mean(Y_ - (a * X + b))
                     print(f"step: {i}, loss: {loss:.4f}, a: {a.item():.4f}, b: {b.item():.4f}, grad_a: {a.grad.item():.4f}, man_grad_a: {grad_a.item():.4f}, grad_b: {b.grad.item():.4f}, man_grad_b: {grad_b.item():.4f}")
                 else:
                     print(f"step: {i}, loss: {loss:.4f}, a: {a.item():.4f}, b: {b.item():.4f}, grad_a: {a.grad.item():.4f}, grad_b: {b.grad.item():.4f}")
@@ -36,11 +36,11 @@ class PTLinreg:
         if print_step != 0:
             Y = a * X + b
             diff = Y_ - Y
-            loss = torch.sum(diff ** 2)
+            loss = torch.mean(diff ** 2)
             loss.backward()
             if manual_grad:
-                grad_a = -2 * torch.sum(X * (Y_ - (a * X + b)))
-                grad_b = -2 * torch.sum(Y_ - (a * X + b))
+                grad_a = -2 * torch.mean(X * (Y_ - (a * X + b)))
+                grad_b = -2 * torch.mean(Y_ - (a * X + b))
                 print(f"FINAL: loss: {loss:.4f}, a: {a.item():.4f}, b: {b.item():.4f}, grad_a: {a.grad.item():.4f}, man_grad_a: {grad_a.item():.4f}, grad_b: {b.grad.item():.4f}, man_grad_b: {grad_b.item():.4f}")
             else:
                 print(f"FINAL: loss: {loss:.4f}, a: {a.item():.4f}, b: {b.item():.4f}, grad_a: {a.grad.item():.4f}, grad_b: {b.grad.item():.4f}")
@@ -65,7 +65,7 @@ if __name__=="__main__":
     Y_ = a * (X + (torch.rand(50) - 0.5) * spread) + b
 
     model = PTLinreg()
-    model.train(X, Y_, 0.0001, manual_grad=True)
+    model.train(X, Y_, 0.01, manual_grad=True)
 
     x_line = torch.linspace(X.min().item(), X.max().item(), 100)
     y_line = (model.a * x_line + model.b).detach().numpy()

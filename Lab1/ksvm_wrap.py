@@ -3,7 +3,6 @@ from pt_logreg import one_hot
 import numpy as np
 import data
 import matplotlib.pyplot as plt
-from logreg import eval_perf_multi
 import pt_deep as deep
 from pt_logreg import train, eval
 import torch
@@ -57,7 +56,7 @@ if __name__=="__main__":
     model = KSVMWrap(X, Y_)
     Y = model.predict(X)
     
-    accuracy, conf, precisions, recalls = eval_perf_multi(Y, Y_)
+    accuracy, conf, precisions, recalls = data.eval_perf_multi(Y, Y_)
     print(f"accuracy: {accuracy}")
     print(f"confusion matrix:\n{conf}")
     print(f"precisions: {precisions}")
@@ -112,7 +111,7 @@ if __name__=="__main__":
         data.graph_data(X, Y_, Y)
         plt.title(f"PTDeep {data_param}")
 
-        accuracy, _, _, _ = eval_perf_multi(Y, Y_)
+        accuracy, _, _, _ = data.eval_perf_multi(Y, Y_)
         print(f"PTDeep {data_param} accuracy: {accuracy}")
 
         model_ksvm = KSVMWrap(X, Y_)
@@ -124,7 +123,7 @@ if __name__=="__main__":
         data.graph_data(X, Y_, Y, model_ksvm.support)
         plt.title(f"KSVMWrap {data_param}")
 
-        accuracy, _, _, _ = eval_perf_multi(Y, Y_)
+        accuracy, _, _, _ = data.eval_perf_multi(Y, Y_)
         print(f"KSVMWrap {data_param} accuracy: {accuracy}")
 
     plt.show()

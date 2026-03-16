@@ -59,41 +59,6 @@ class Logreg:
         probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
         return probs
 
-def eval_perf_multi(Y, Y_):
-    """
-    Parameters:
-        Y - predicted classes
-        Y_ - true classes
-
-    Returns:
-        accuracy
-        confusion matrix
-        precisions
-        recalls
-    """
-
-    n_classes = max(Y.max(), Y_.max()) + 1
-    conf = np.zeros((n_classes, n_classes), dtype=int)
-
-    for t, p in zip(Y_, Y):
-        conf[t, p] += 1
-
-    accuracy = np.trace(conf) / np.sum(conf)
-
-    precision = np.zeros(n_classes)
-    for i in range(n_classes):
-        sum = np.sum(conf[:, i])
-        if sum > 0:
-            precision[i] = conf[i, i] / np.sum(conf[:, i])
-
-    recall = np.zeros(n_classes)
-    for i in range(n_classes):
-        sum = np.sum(conf[i, :])
-        if sum > 0:
-            recall[i] = conf[i, i] / np.sum(conf[i, :])
-
-    return accuracy, conf, precision, recall
-
 def classify_wrapper(model):
     def predict(X):
         probs = model.classify(X)

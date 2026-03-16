@@ -130,6 +130,41 @@ def sample_gmm_2d(K, C, N, parts=1):
             data_parts.append((X_part, Y_part))
         return data_parts
 
+def eval_perf_multi(Y, Y_):
+    """
+    Parameters:
+        Y - predicted classes
+        Y_ - true classes
+
+    Returns:
+        accuracy
+        confusion matrix
+        precisions
+        recalls
+    """
+
+    n_classes = max(Y.max(), Y_.max()) + 1
+    conf = np.zeros((n_classes, n_classes), dtype=int)
+
+    for t, p in zip(Y_, Y):
+        conf[t, p] += 1
+
+    accuracy = np.trace(conf) / np.sum(conf)
+
+    precision = np.zeros(n_classes)
+    for i in range(n_classes):
+        sum = np.sum(conf[:, i])
+        if sum > 0:
+            precision[i] = conf[i, i] / sum
+
+    recall = np.zeros(n_classes)
+    for i in range(n_classes):
+        sum = np.sum(conf[i, :])
+        if sum > 0:
+            recall[i] = conf[i, i] / sum
+
+    return accuracy, conf, precision, recall
+
 if __name__=="__main__":
     def myDummyDecision(X):
         scores = X[:,0] + X[:,1] - 5

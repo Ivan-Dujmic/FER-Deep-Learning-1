@@ -5,7 +5,6 @@ import numpy as np
 import data
 import matplotlib.pyplot as plt
 from pt_logreg import train
-from logreg import eval_perf_multi
 from pt_logreg import one_hot, eval
 
 class PTDeep(nn.Module):
@@ -108,7 +107,7 @@ if __name__=="__main__":
                 def predict(X):
                     return np.argmax(eval(model, X), axis=1)
                 
-                accuracy, conf, precisions, recalls = eval_perf_multi(Y, Y_)
+                accuracy, conf, precisions, recalls = data.eval_perf_multi(Y, Y_)
                 print(f"accuracy: {accuracy}")
                 print(f"confusion matrix:\n{conf}")
                 print(f"precisions: {precisions}")
