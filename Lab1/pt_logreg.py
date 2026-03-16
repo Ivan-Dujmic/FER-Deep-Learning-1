@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-import data
 import matplotlib.pyplot as plt
+import data
 import logreg
 
 class PTLogreg(nn.Module):
@@ -79,7 +79,7 @@ def train(model, X, Yoh_, reg_coe=0.0, lr=0.01, steps=10000, print_step=500):
 def eval(model, X, Y=None):
     """
     Parameters:
-        model - type: PTLogreg
+        model
         X - data, type: np.array
         Y - optional to get loss print
         
@@ -125,7 +125,7 @@ if __name__=="__main__":
     Yoh_test = one_hot(Y_test)
     rect_test = (np.min(X_test, axis=0), np.max(X_test, axis=0))
 
-    reg_coe = 0.00001
+    reg_coe = 1e-5
 
     fig, axs = plt.subplots(2, 3, figsize=(15, 10))
     axs = axs.flatten()

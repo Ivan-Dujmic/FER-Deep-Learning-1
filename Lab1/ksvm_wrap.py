@@ -1,11 +1,11 @@
-from sklearn.svm import SVC
-from pt_logreg import one_hot
-import numpy as np
-import data
-import matplotlib.pyplot as plt
-import pt_deep as deep
-from pt_logreg import train, eval
 import torch
+import numpy as np
+import matplotlib.pyplot as plt
+import data
+from pt_logreg import one_hot, train, eval
+import pt_deep as deep
+from sklearn.svm import SVC
+from sklearn.metrics import average_precision_score
 
 class KSVMWrap:
     def __init__(self, X, Y_, C=1, gamma='auto'):
@@ -20,7 +20,6 @@ class KSVMWrap:
         self.model = SVC(C=C, gamma=gamma, kernel='rbf', probability=True)
         self.model.fit(X, Y_)
         self.support_ = self.model.support_
-        self.Yoh = one_hot(Y_)
 
     def predict(self, X):
         """
@@ -56,11 +55,12 @@ if __name__=="__main__":
     model = KSVMWrap(X, Y_)
     Y = model.predict(X)
     
-    accuracy, conf, precisions, recalls = data.eval_perf_multi(Y, Y_)
+    accuracy, _, precisions, recalls = data.eval_perf_multi(Y, Y_)
+    avg_precision = average_precision_score(Y_, model.get_scores(X)[:,1])
     print(f"accuracy: {accuracy}")
-    print(f"confusion matrix:\n{conf}")
-    print(f"precisions: {precisions}")
     print(f"recalls: {recalls}")
+    print(f"precisions: {precisions}")
+    print(f"avg precision: {avg_precision}")
 
     rect = (np.min(X, axis=0), np.max(X, axis=0))
     data.graph_surface(model.predict, rect)
@@ -80,9 +80,9 @@ if __name__=="__main__":
         44,
         100,
         100,
-        100,
-        100,
-        100
+        47,
+        47,
+        47
     ]
 
     fig, axs = plt.subplots(3, 4, figsize=(15, 15))

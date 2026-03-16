@@ -1,6 +1,6 @@
 import numpy as np
-import data
 import matplotlib.pyplot as plt
+import data
 
 class FCANN2:
     def train(self, X, Y_, n_hidden=5, lr=0.05, reg_coe=0.001, steps=10000, print_step=500):

@@ -1,11 +1,9 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import numpy as np
-import data
 import matplotlib.pyplot as plt
-from pt_logreg import train
-from pt_logreg import one_hot, eval
+import data
+from pt_logreg import train, one_hot, eval
 
 class PTDeep(nn.Module):
     def __init__(self, config, activation=torch.relu):

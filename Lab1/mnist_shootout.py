@@ -1,10 +1,10 @@
+import copy
 import torch
 import torchvision
 import matplotlib.pyplot as plt
 import pt_deep
 from pt_logreg import train
 import torch.nn.functional as F
-import copy
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.svm import SVC
 
@@ -69,27 +69,6 @@ def eval(model, x, y):
 
     return acc, prec, rec
 
-def plot_results(results):
-    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
-
-    axes = axes.flatten()
-
-    for i, config in enumerate(results):
-        losses_train, losses_val = results[config]
-
-        ax = axes[i]
-
-        ax.plot(losses_train, label="train")
-        ax.plot(losses_val, label="val")
-
-        ax.set_title(config)
-        ax.set_xlabel("epoch")
-        ax.set_ylabel("loss")
-        ax.legend()
-
-    plt.tight_layout()
-    plt.show()
-
 dataset_root = '/tmp/mnist'
 mnist_train = torchvision.datasets.MNIST(dataset_root, train=True, download=True)
 mnist_test = torchvision.datasets.MNIST(dataset_root, train=False, download=True)
@@ -113,6 +92,27 @@ x_tr = x_train[train_idx]
 y_tr = yoh_train[train_idx]
 x_val = x_train[val_idx]
 y_val = yoh_train[val_idx]
+
+def plot_results(results):
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+
+    axes = axes.flatten()
+
+    for i, config in enumerate(results):
+        losses_train, losses_val = results[config]
+
+        ax = axes[i]
+
+        ax.plot(losses_train, label="train")
+        ax.plot(losses_val, label="val")
+
+        ax.set_title(config)
+        ax.set_xlabel("epoch")
+        ax.set_ylabel("loss")
+        ax.legend()
+
+    plt.tight_layout()
+    plt.show()
 
 # EXPERIMENTS
 if "regularization" in experiments:

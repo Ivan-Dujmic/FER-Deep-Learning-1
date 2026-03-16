@@ -1,6 +1,6 @@
 import numpy as np
-import data
 import matplotlib.pyplot as plt
+import data
 
 class Logreg:
     def train(self, X, Y_, lr=0.01, steps=10000, print_step=500):
