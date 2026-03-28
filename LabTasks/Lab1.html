@@ -1,0 +1,1832 @@
+<!DOCTYPE html public "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>Prva laboratorijska vježba iz Dubokog učenja</title>
+  <link rel="stylesheet" type="text/css" href="./dl.css" >
+  <link rel="stylesheet" href="./highlight/styles/default.min.css">
+  <script type="text/javascript" src="./mathjax/tex-mml-chtml.js"></script>
+  <script src="./highlight/highlight.min.js"></script>
+</head>
+
+<body>
+
+<div id="page">
+<h2>Prva laboratorijska vježba iz Dubokog učenja</h2>
+<h4>Gradijenti višeslojnih mreža, uvod u PyTorch, potpuno povezani duboki modeli, studija slučaja: MNIST</h4>
+
+<p>
+Predmet ove vježbe su unaprijedni duboki modeli za klasifikaciju.
+Pokazat ćemo da se ti modeli mogu promatrati
+ili kao višeslojne unaprijedne neuronske mreže
+ili kao produbljeni logistički modeli
+koje smo upoznali u nultoj vježbi.
+Oba pogleda vode na istu programsku izvedbu koja se temelji
+na optimiranju izglednosti parametara modela.
+Kako bismo olakšali razvoj i ubrzali eksperimentiranje,
+proučit ćemo mogućnost automatske diferencijacije
+koju danas nude brojni programski okviri za numeričku optimizaciju.
+Posebnu pažnju poklonit ćemo PyTorchu
+kao jednom od najčešće korištenih alata te kategorije.
+
+<p>
+Cilj vježbe je razviti sedam modula:
+<code>data</code>,
+<code>fcann2</code>,
+<code>pt_linreg</code>,
+<code>pt_logreg</code>,
+<code>pt_deep</code>,
+<code>ksvm_wrap</code>,
+i <code>mnist_shootout</code>.
+Modul <code>data</code> će biti nadograđena
+verzija istoimenog modula iz nulte vježbe.
+Modul <code>fcann2</code> će sadržavati implementaciju
+dvoslojnog potpuno povezanog modela
+temeljenog na NumPyjevim primitivima.
+Organizacijski i izvedbeno, taj modul bi trebao biti
+vrlo sličan modulu <code>logreg</code> iz nulte vježbe.
+Moduli <code>pt_linreg</code>, <code>pt_linreg</code> 
+i <code>pt_deep</code> implementirat će 
+tri algoritma strojnog učenja u okviru PyTorch.
+Modul <code>ksvm_wrap</code> će umatati
+klasifikator s jezgrenim ugrađivanjem i potpornim vektorima
+izveden u modulu <code>sklearn.svm</code> biblioteke 
+<code>scikit-learn</code> te omogućiti usporedbu
+s klasifikatorima temeljenima na dubokom učenju.
+Konačno, modul <code>mnist_shootout</code>
+će usporediti performansu do tada razvijenih klasifikatora
+na skupu podataka MNIST.
+
+<h4 id="z0a">0a. Uvodne napomene o dubokim modelima</h4>
+
+<p>
+Duboki modeli strojnog učenja temelje se 
+na apstraktnim reprezentacijama podataka
+do kojih dolazimo slijedom
+naučenih nelinearnih transformacija.
+U ovoj i sljedećoj vježbi razmatramo duboke modele
+koji su <em>diskriminativni</em> i <em>unaprijedni</em>.
+Diskriminativni model za dani podatak \(\mathbf{x}\)
+na izlazu izravno generira uvjetnu vjerojatnost
+zavisne varijable \(P(Y|\mathbf{X})\).
+Diskriminativne modele tipično koristimo
+kad na raspolaganju imamo <emph>označene</emph> podatke
+prikladne za nadzirano učenje.
+U unaprijednom modelu tok informacija je jednosmjeran
+što znači da (među)rezultati obrade
+ne mogu biti spojeni unatrag prema izlazu.
+Osnovni diskriminativni duboki model jest
+višeslojna unaprijedna neuronska mreža.
+
+<h5> Umjetne neuronske mreže</h5>
+
+<p>
+Umjetne neuronske mreže su model strojnog učenja
+kojeg izražavamo usmjerenim grafom
+skalarnih procesnih jedinica
+koje nazivamo umjetnim neuronima.
+Jedan od važnih ciljeva razvoja neuronskih mreža
+je postavljanje računskog modela biološkog učenja
+odnosno razumijevanje mehanizama učenja u mozgu živog bića. 
+Iako je vrlo srodno neuronskim mrežama,
+duboko učenje nema ambiciju modelirati biološke procese,
+nego proučava učenje kompozicijskih modela od praktičnog značaja
+koji mogu i ne moraju imati biološku interpretaciju.
+
+<p>
+Umjetni neuroni tipično provode
+afinu redukciju ulaznog vektora,
+što možemo sažeto prikazati izrazom
+\( f(\mathbf{w}^\top\mathbf{x}+b) \).
+Pri tome vektor \( \mathbf{x} \)
+predstavlja ulazne varijable,
+vektor \( \mathbf{w} \) i skalar \( b \)
+predstavljaju slobodne parametre
+koji se optimiraju postupkom učenja,
+dok \( f \) predstavlja tzv.
+prijenosnu funkciju umjetnog neurona.
+Uloga prijenosne funkcije je da u model unese nelinearnost.
+Ako za \( f \) odaberemo funkciju softmax,
+umjetni neuron će provoditi
+višerazrednu logističku regresiju.
+Ako za \( f \) odaberemo sigmoidalnu funkciju
+\( σ(s)=e^s/(1+e^s) \),
+umjetni neuron će provoditi binarnu logističku regresiju.
+Zbog boljeg učenja dubokih modela,
+sigmoidu danas istiskuje zglobnica
+(engl. rectified linear unit, ReLU)
+\( f(s) = \mathrm{ReLU}(s) = \max(0, s) \) .
+
+<h5> Višeslojne unaprijedne mreže</h5>
+
+<p>
+Neuronska mreža s jednim ulaznim slojem,
+sofmaksom na izlazu, i gubitkom
+koji maksimizira izglednost parametara
+ekvivalentna je logističkoj regresiji.
+Međutim, na ovom kolegiju proučavamo "produbljene" modele
+koje dobivamo kad između ulaza i izlaza
+logističke regresije dodamo
+jednu ili više nelinearnih transformacija.
+Među njima, posebnu klasu čine unaprijedni modeli
+u kojima ne postoje povratne veze među neuronima.
+Takve modele možemo predstaviti
+acikličkim usmjerenim grafom
+gdje čvorovi odgovaraju neuronima,
+dok lukovi modeliraju povezanost neurona.
+Poput logističke regresije,
+unaprijedne duboke modele
+najčešće učimo gradijentnim spustom
+koji optimira izglednost predviđanja modela.
+Suprotno od logističke regresije, 
+funkcija gubitka dubokih modela nije konveksna,
+što znači da ne postoji garancija
+da ćemo naći globalni optimum.
+
+<p>
+U ovoj vježbi posebno će nam biti zanimljive
+višeslojne mreže s potpuno povezanim slojevima.
+U takvim mrežama neurone možemo organizirati 
+u slojeve \( S_k \)
+za koje vrijedi da neuroni sloja \( k \) 
+na svojim ulazima primaju sve neurone sloja \( k-1 \).
+Za razliku od logističke regresije,
+višeslojni modeli mogu modelirati
+nelinearnu decizijsku granicu,
+ali po cijeni nekonveksne funkcije cilja.
+
+<p>
+U posljednje vrijeme popularno je,
+umjesto pojedinih neurona,
+čitav sloj promatrati kao kompoziciju
+linearnog i nelinearnog koraka obrade.
+Ako se dogovorimo da prijenosna funkcija
+vektorskog operanda odgovara konkatenaciji
+prijenosnih funkcija komponenata,
+dolazimo do sljedećeg sažetog zapisa
+k-tog sloja unaprijedne potpuno povezane mreže
+sa zglobnom aktivacijom:
+
+<p>
+\(
+ \mathbf{s_k} =
+   \mathbf{W_k}\cdot\mathbf{h_{k-1}}
+   + \mathbf{b_k}
+ \\
+ \mathbf{h_k} = \mathrm{ReLU}(\mathbf{s_k})  
+\)
+
+<p>
+Sljedeća ilustracija prikazuje dva pogleda
+na istu potpuno povezanu unaprijednu mrežu.
+Na lijevoj strani je klasični prikaz
+gdje krugovi odgovaraju neuronima 
+sa skalarnim izlazom i zglobnom prijenosnom funkcijom.
+Na desnoj strani je vektorizirani računski graf
+kojeg ćemo koristiti u ovom kolegiju:
+
+<img src="figures/ann.png" alt="data">
+
+<h5> Gradijenti u dvoslojnom potpuno povezanom modelu</h5>
+<p>
+Razmotrimo sada kako bismo odredili gradijente
+u prethodno prikazanom primjeru dvoslojnog
+potpuno povezanog modela.
+Izrazimo klasifikacijski model vektorskim jednadžbama:
+
+<p>
+\(
+ \mathbf{s_1} = \mathbf{W_1} \cdot \mathbf{x}
+      + \mathbf{b_1} \\
+ \mathbf{h_1} = \mathrm{ReLU}(\mathbf{s_1})  \\
+ \mathbf{s_2} = \mathbf{W_2} \cdot \mathbf{h_1}
+      + \mathbf{b_2}  \\
+ P(Y|\mathbf{x}) = \mathrm{softmax}(\mathbf{s_2})  .
+\)
+
+<p>
+Naša funkcija gubitka biti će
+prosjek negativne log-izglednosti modela
+preko svih podataka:
+
+<p>
+\(
+ L(\mathbf{W_1},\mathbf{b_1},
+   \mathbf{W_2},\mathbf{b_2}|
+   \mathbf{X}, \mathbf{y})
+ =
+   -\frac{1}{N}
+   \sum_i \log P(Y=y_i|\mathbf{x}_i) 
+\)
+
+<p>
+Vidimo da funkcija gubitka u podatku \( \mathbf{x}_i \)
+odgovara kompoziciji većeg broja jednostavnijih funkcija.
+Gubitak \(L\) ovisi o vjerojatnostima \(P\) koje ovise o
+linearnoj klasifikacijskoj mjeri drugog sloja \(\mathbf{s_2}\)
+koja ovisi o skrivenom sloju \(\mathbf{h_1}\)
+i parametrima \(\mathbf{W_2}\) i \(\mathbf{b_2}\).
+Skriveni sloj \(\mathbf{h_1}\) ovisi
+o svojoj linearnoj mjeri \(\mathbf{s_1}\),
+koja konačno ovisi o parametrima
+\(\mathbf{W_1}\) i \(\mathbf{b_1}\)
+te podatcima \(\mathbf{x}\).
+Stoga gradijente gubitka obzirom na parametre određujemo
+<a href="https://en.wikipedia.org/wiki/Chain_rule#Higher_dimensions">ulančavanjem</a>.
+Parcijalne derivacije gubitka po j-tim retcima
+\( \mathbf{W_2} \) i \( \mathbf{b_2} \)
+biti će vrlo slične onom što smo imali
+u višerazrednoj logističkoj regresiji.
+U obzir ćemo uzeti algebarsku strukturu problema,
+tj. da vrijedi:
+
+\(
+  \partial {s_2}_{ij}/
+  \partial \mathbf{W_2}_{k:}
+  =
+  \partial {s_2}_{ij}/
+  \partial \mathbf{b_2}_{k:}
+  =
+  0,
+  \; \forall k \neq j \; .
+\)
+<!--
+Da bismo postigli kompaktniji zapis
+koristit ćemo funkciju
+\(\mathrm{lone\_row}(j,\mathbf{q})\)
+koja vraća matricu \(\mathbf{Q}\)
+čiji j-ti redak je vektor \(\mathbf{q}\),
+dok su ostali retci nul-vektori.
+Dogovorit ćemo se i da ta ista funkcija
+primijenjena na skalarni argument
+vraća stupčani vektor
+čija j-ta komponenta odgovara skalarnom argumentu
+dok su ostali elementi jednaki nuli.
+-->
+Da bismo postigli kompaktniji zapis
+k-ti redak matrice \(\mathbf{W_2}\)
+označit ćemo kao
+\(\mathbf{W_2}_{k:}\).
+Nadalje, rezultat ćemo izraziti uz pomoć
+matrice aposteriornih vjerojatnosti \(\mathbf{P}\)
+te matrice vektorski kodiranih oznaka \(\mathbf{Y'}\)
+koje smo uveli u nultoj vježbi.
+Na kraju dobivamo sljedeće izraze:
+
+<p>
+\(
+\frac{∂L_i}{∂\mathbf{W_2}_{j:}} 
+  =
+  \frac{∂L_i}{∂{s_2}_{ij}} \cdot
+  \frac{∂{s_2}_{ij}}{∂\mathbf{W_2}_{j:}}
+  =
+  ({P}_{ij} - {Y'}_{ij}) \cdot
+   \mathbf{h_1}_i^\top \; ,
+  \\
+\frac{∂L_i}{∂b_{2j}}
+  =
+  \frac{∂L_i}{∂\mathbf{s_2}_{ij}} \cdot
+  \frac{∂\mathbf{s_2}_{ij}}{∂b_{2j}}
+  =
+  ({P}_{ij} - {Y'}_{ij}) \; .
+\)
+
+<!--
+<p>
+\(
+\frac{∂L_i}{∂\mathbf{W_2}_{j:}} =
+  \frac{∂L_i}{∂\mathbf{s_2}_i} \cdot
+  \frac{∂\mathbf{s_2}_i}{∂\mathbf{W_2}_{j:}} =
+  (\mathbf{P}_{i:} - \mathbf{Y'}_{i:}) \cdot
+  \mathrm{lone\_row}(j,\mathbf{h_1}_i) =
+  (\mathbf{P}_{ij} - \mathbf{Y'}_{ij}) \cdot
+   \mathbf{h_1}_i^\top \; ,
+  \\
+\frac{∂L_i}{∂b_{2j}} =
+  \frac{∂L_i}{∂\mathbf{s_2}_i} \cdot
+  \frac{∂\mathbf{s_2}_i}{∂b_{2j}} = 
+  (\mathbf{P}_{i:} - \mathbf{Y'}_{i:}) \cdot
+  \mathrm{lone\_row}(j,1) =
+  (\mathbf{P}_{ij} - \mathbf{Y'}_{ij}) \; .
+\)
+-->
+ 
+<p>
+Put do gradijenata po
+\(\mathbf{W_1}\) i \(\mathbf{b_1}\)
+nešto je složeniji,
+jer gradijente treba propagirati
+preko svih komponenata drugog sloja.
+Međutim, to propagiranje nije komplicirano
+jer Jakobijan linearnog sloja odgovara matrici težina,
+dok je Jakobijan zglobnice dijagonalna matrica
+koja na dijagonali ima nule i jedinice
+ovisno o predznaku odgovarajuće komponente prvog sloja.
+Kad konačno dođemo do linearne mjere prvog sloja,
+možemo iskoristiti izvode
+koje smo bili dobili u drugom sloju.
+Ovisnost linearne klasifikacijske mjere drugog sloja
+o parametrima drugog sloja posve je jednaka
+ovisnosti linearne mjere prvog sloja
+o parametrima prvog sloja.
+Stoga su analitički izrazi parcijalnih derivacija
+\(\partial \mathbf{s}_1/\partial \mathbf{W_1}\)
+vrlo slični odgovarajućim izrazima u drugom sloju:
+
+<p>
+\(
+\frac{∂L_i}{∂\mathbf{s_1}_{i}}
+  =
+  \frac{∂L_i}{∂\mathbf{s_2}_i} \cdot
+  \frac{∂\mathbf{s_2}_i}{∂\mathbf{h_1}_{i}} \cdot
+  \frac{∂\mathbf{h_1}_{i}}{∂\mathbf{s_1}_{i}} \cdot
+  =
+  (\mathbf{P}_{i:} - \mathbf{Y'}_{i:}) \cdot
+  \mathbf{W_2} \cdot
+  \mathrm{diag}([\![s_{1i:}>0]\!]) \;,
+\\
+\frac{∂L_i}{∂\mathbf{W_1}_{j:}}
+  =
+  \frac{∂L_i}{∂{s_1}_{ij}}
+  \frac{∂\mathbf{s_1}_{ij}}{∂\mathbf{W_1}_{j:}}
+  =
+  \frac{∂L_i}{∂{s_1}_{ij}}
+  \mathbf{x_i}^\top \;,
+\\
+\frac{∂L_i}{∂b_{1j}} 
+  =
+  \frac{∂L_i}{∂{s_1}_{ij}}
+  \frac{∂\mathbf{s_1}_{ij}}{∂{b_1}_{j}}
+  =
+  \frac{∂L_i}{∂{s_1}_{ij}}
+\)
+
+<p>
+U nastavku ćemo termin <i>gradijent</i> koristiti
+i za parcijalnu derivaciju gubitka po parametrima
+kao i za pojedine dijelove tog vektora.
+Točno značenje moći će se pogoditi iz konteksta.
+Jednaka konvencija koristi se i u znanstvenoj literaturi.
+Tako će se izraz <i>četiri gradijenta</i>,
+odnositi na lijeve strane
+gore navedene četiri jednadžbe.
+
+<p>
+Ovdje valja primijetiti kako
+naša ambicija nije brzo izračunati
+<em>pojedine</em> gradijente
+za <em>pojedine</em> podatke.
+Naprotiv, naš cilj je brzo izračunati
+<em>sve</em> gradijente za <em>sve</em> podatke
+oslanjanjem na optimirane biblioteke matrične algebre.
+S obzirom na to da najveći doprinos brzini
+možemo ostvariti memorijskim optimizacijama,
+model trebamo izraziti matričnim operacijama
+koje djeluju nad svim podatcima.
+Stoga ćemo, kao i kod logističke regresije
+gradijente svakog sloja računati odjednom
+za sve retke parametara i za sve podatke.
+
+<p>
+Međutim, za razliku od logističke regresije,
+u dubokim mrežama moramo donijeti odluku
+o redoslijedu računanja gradijenata
+(npr. hoćemo li prije računati 
+ \(\frac{∂L_i}{∂\mathbf{b_1}}\)
+ ili 
+ \(\frac{∂L_i}{∂\mathbf{b_2}}\)).
+Putokaz za rješavanje tog rebusa
+daje nam algoritam širenja unatrag.
+
+<h5>Računanje gradijenata širenjem unatrag</h5>
+
+<p>
+U prikazanim jednadžbama možemo uočiti
+jednu specifičnost dubokih modela:
+vidimo da se parcijalna derivacija
+\( \frac{∂L_i}{∂\mathbf{s_2}_i} \)
+javlja u sva četiri gradijenta 
+po parametrima funkcije gubitka.
+Tu specifičnost možemo iskoristiti
+kako bismo do željenih gradijenata
+došli uz minimalni računski napor.
+Parcijalne derivacije funkcije cilja
+po čvorovima računskog grafa
+nećemo morati računati više od jednom 
+ako ih budemo računali <em>unatrag</em>,
+od izlaza prema ulazu mreže.
+Taj jednostavni ali vrlo efikasni pristup
+formalizira algoritam širenja unatrag (engl. backprop).
+
+<p>
+Postupak širenja pogreške unatrag
+prikazali smo na sljedećoj slici.
+Crne strelice prikazuju evaluiranje modela
+i računanje gubitka u zadanom podatku
+(tzv. unaprijedni prolaz, engl. forward pass).
+Crvene strelice prikazuju
+postupno računanje gradijenata
+prema algoritmu širenja unatrag
+(tzv. unatražni prolaz, engl. backward pass).
+
+<p>
+<img src="figures/backprop3.png" alt="data">
+
+<p>
+Sad se čini da su nam poznate
+sve komponente rješenja našeg problema.
+Znamo kako računati gradijente
+s obzirom na pojedine parametre,
+kao i kojim redoslijedom to obaviti.
+Međutim, htjeli bismo prije kraja 
+još jednom naglasiti dva netrivijalna detalja.
+Prvi detalj je petlja po podatcima.
+Ako želimo uživati prednosti optimiranih biblioteka
+i izbjeći iteriranje u Pythonu,
+onda svaki pojedini gradijent
+trebamo odjednom izračunati za sve podatke.
+Ako imamo 100000 podataka, prvo ćemo izračunati
+100000 redaka matrice
+\(
+        \mathbf{G}_\mathbf{s_2} =
+        [
+          (\frac{∂L_i}{∂\mathbf{s_2}_{i}})_{i=1}^N
+        ]
+\),
+zatim 100000 redaka matrice
+\(
+        \mathbf{G}_\mathbf{h_1} =
+        [
+          (\frac{∂L_i}{∂\mathbf{h_1}_{i}})_{i=1}^N
+        ]
+\),
+itd.
+Ovakav pristup je vrlo neobičan za inženjere
+koji su navikli sve pisati u vlastitom aranžmanu,
+jer strahovito povećava memorijske zahtjeve postupka.
+Međutim, tu cijenu moramo platiti,
+jer u suprotnom naš algoritam ne bismo mogli izraziti
+optimiranim lego-kockicama za matrične operacije
+pa bi nam učenje bilo sporije za nekoliko redova veličine.
+
+<p>
+Drugi detalj je računanje gradijenata težina.
+Ovdje vam preporučamo da umjesto odvojenog računanja
+gradijenata po retcima težina
+(kao što sugeriraju gore navedene jednadžbe)
+koristite pristup kojeg smo u nultoj vježbi
+pokazali na logističkoj regresiji
+(isp. odjeljak 0d uvodne vježbe).
+Naime, nije previše teško pokazati
+da se kompletna matrica gradijenata
+(koja se u iteraciji gradijentnog spusta
+naprosto dodaje matrici težina)
+može izraziti jednostavnim matričnim umnoškom.
+Gradijente težina u k-tom sloju 
+\(\mathrm{grad}(\mathbf{W_k}) \)
+dobivamo množenjem transponirane matrice gradijenata gubitka
+po linearnoj mjeri k-tog sloja u svim podatcima 
+\(\mathbf{G}_\mathbf{s_k}\)
+s matricom svih ulaza u k-ti sloj
+\(\mathbf{H}_{k-1}\).
+<!--
+\(
+  \mathrm{grad}(\mathbf{W_k}) =
+    \mathbf{G}_\mathbf{s_k}^\top 
+    \cdot
+    \mathbf{H}_{k-1} \; .
+\) 
+-->
+Na sličan način računamo i sve gradijente
+po komponentama pomaka k-tog sloja.
+Ovdje nam umjesto matričnog množenja
+treba zbrajanje stupaca matrice \(\mathbf{G}_\mathbf{s_k}\),
+a za to možemo koristiti funkciju <code>np.sum</code>.
+
+<p>
+U konkretnom primjeru naše dvoslojne mreže,
+imali bismo sljedeći redoslijed računanja
+parcijalnih derivacija funkcije gubitka:
+
+<ol>
+  <li>
+  gradijenti gubitka obzirom na 
+  linearnu mjeru drugog sloja
+  u svim podatcima:
+  <ul style="list-style-type:none">
+    <li>
+      \(
+        \mathbf{G}_\mathbf{s_2} =
+        [
+          (\frac{∂L_i}{∂\mathbf{s_2}_{i}})_{i=1}^N
+        ]
+      \)
+    (matrica dimenzija NxC);
+  </ul>
+  <li>
+  gradijenti gubitka obzirom
+  na parametre drugog sloja 
+  <ul>
+    <li> 
+      grad(\(\mathbf{W_2})\)
+        \(
+        =[ (\frac{∂L}{∂\mathbf{W_2}_{j:}}^\top)_{j=1}^C ]^\top
+        =\mathbf{G}_\mathbf{s_2}^\top
+         \cdot
+         \mathbf{H}_{1}
+        \)
+        (matrica dimenzija CxH),
+    <li> 
+       grad(\(\mathbf{b_2})\) =
+         \([ (\frac{∂L}{∂{b_2}_j})_{j=1}^C ]^\top \)
+         (matrica dimenzija Cx1);
+  </ul>
+  <li>
+  gradijenti gubitka obzirom na 
+  nelinearni izlaz prvog sloja
+  u svim podatcima:
+  <ul style="list-style-type:none">
+    <li> 
+      \(
+        \mathbf{G}_\mathbf{h_1} =
+        [
+          (\frac{∂L_i}{∂\mathbf{h_1}_{i}})_{i=1}^N
+        ]
+      \)
+      (matrica dimenzija NxH);
+  </ul>
+  <li>
+  gradijent gubitka obzirom na 
+  linearnu mjeru prvog sloja
+  u svim podatcima:
+  <ul style="list-style-type:none">
+    <li> 
+      \(
+        \mathbf{G}_\mathbf{s_1} =
+        [
+          (\frac{∂L_i}{∂\mathbf{s_1}_{i}})_{i=1}^N
+        ]
+      \)
+      (matrica dimenzija NxH);
+  </ul>
+  <li>
+  gradijenti gubitka obzirom na parametre prvog sloja:
+  <ul>
+    <li> 
+      grad(\(\mathbf{W_1})\) 
+        \(
+        =[ (\frac{∂L}{∂\mathbf{W_1}_{j:}}^\top)_{j=1}^H ]^\top 
+        =\mathbf{G}_\mathbf{s_1}^\top
+         \cdot
+         \mathbf{X}
+        \)
+        (matrica dimenzija HxD),
+    <li> 
+      grad(\(\mathbf{b_1})\) =
+         \([ (\frac{∂L}{∂{b_1}_j})_{j=1}^H ]^\top \)
+         (matrica dimenzija Hx1).
+  </ul>
+</ol>
+
+<h5>Izbjeljivanje podataka i inicijalizacija parametara</h5>
+
+<p>
+Kod modela učenih s gradijentnim spustom
+početna inicijalizacija parametara
+predstavlja jako važnu odluku.
+Kod latentnih slojeva aktiviranih zglobnicom,
+aktivacije moraju biti centrirane oko nule
+tako da zglobnica dođe do izražaja.
+Primjerice, kad bi svi ulazi bili pozitivni
+i kad bi sve težine bile pozitivne,
+sve zglobnice bi bile propusne
+i učinak sloja bio bi u potpunosti linearan.
+To ne može biti dobro
+jer je kombinacija linearnih transformacija
+ponovo linearna transformacija,
+a znamo da linearne transformacije imaju
+puno manji kapacitet od
+duboke kompozicije nelinearnih transformacija.
+Pouka ove rasprave jest da će učenje dubokog modela
+dobro napredovati ako:
+<ul>
+<li>
+  inicijaliziramo težine prema distribuciji
+  koja je centrirana u nuli
+  (npr. np.random.randn),
+<li>
+  izbijelimo podatke tako da im oduzmemo srednju vrijednost
+  i podijelimo ih sa standardnom devijacijom.
+</ul>
+
+
+<h4 id="z0b">0b. Uvodne napomene o PyTorchu</h4>
+
+<p>
+PyTorch je biblioteka otvorenog koda 
+za oblikovanje metoda strojnog učenja
+s naglaskom na sljedeće ključne mogućnosti:
+<ul>
+<li>
+  automatsko diferenciranje
+<li>
+  izvršavanje na raspodijeljenim i GPU arhitekturama
+<li>
+  bogato klijentsko sučelje prema Pythonu
+</ul>
+
+<p>
+Iako postoje i drugi slični alati (TensorFlow, MXNet, ...), 
+PyTorch je trenutno najpopularniji među istraživačima,
+pogodan je i za početnike zbog čiste organizacije
+i dobre dokumentacije.
+
+<p>
+PyTorch podržava različite operacijske sustave.
+Za strojno učenje općenito najviše podrške ima i najažurniji je Linux.
+Najsvježije informacije o PyTorchu možete naći na
+<a href="https://www.pytorch.org">službenim stranicama</a>.
+
+
+<!-- TODO: statički i dinamički računski grafovi -->
+
+<p>
+Ilustrirajmo zadavanje programa
+u PyTorchu na jednostavnom primjeru:
+<pre><code class="python">import torch
+# definiranje operacije
+def f(x, a, b):   
+    return a * x + b
+
+# definiranje varijabli i izgradnja dinamičnog 
+# računskog grafa s unaprijednim prolazom
+a = torch.tensor(5., requires_grad=True)
+b = torch.tensor(8., requires_grad=True)
+x = torch.tensor(2.)
+y = f(x, a, b)
+s = a ** 2
+
+# unatražni prolaz koji računa gradijent 
+# po svim tenzorima zadanim s requires_grad=True
+y.backward()
+s.backward()               # gradijent se akumulira
+assert x.grad is None      # pytorch ne računa gradijente po x
+assert a.grad == x + 2 * a # dy/da + ds/da
+assert b.grad == 1         # dy/db + ds/db
+
+# ispis rezultata
+print(f"y={y}, g_a={a.grad}, g_b={b.grad}")
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Prvi dio prikazanog primjera 
+definira običnu funkciju u Pythonu.
+Povratna vrijednost te funkcije 
+transparentno će se uklopiti 
+u računski graf PyTorcha.
+
+<p>
+Drugi dio primjera stvara objekte 
+<code>a</code>, <code>b</code> i <code>x</code> tipa <code>torch.Tensor</code>
+koji će odgovarati listovima računskog grafa. 
+Tenzori <code>a</code> i <code>b</code> 
+imaju atribut <code>requires_grad=True</code>,
+što znači da če za njih PyTorch 
+pri automatskom unatražnom prolazu izračunati gradijent.
+Pozivanje operacija <code>*</code>, <code>+</code> i <code>**</code>
+stvara nove objekta tipa <code>torch.Tensor</code>
+koji su također čvorovi računskog grafa. 
+Dalje ćemo objekte tipa <code>torch.Tensor</code> nazivati tenzorima.
+PyTorch pri izračunavanju vrijednosti čvorova računskog grafa 
+pamti sve međurezultate koji su potrebni za računanje gradijenta.
+Detalje određuje algoritam za automatsku diferencijaciju
+kojeg možemo skraćeno zvati 
+<a href="https://pytorch.org/tutorials/beginner/blitz/autograd_tutorial.html">autograd</a>. 
+
+<p>
+Treći dio primjera računa gradijente
+s obzirom na čvorove <code>y</code> i <code>s</code> 
+pozivima metode <code>backward</code>.
+Autograd provodi unatražnu propagaciju 
+sve do <code>a</code> i <code>b</code>
+te tako računa njihov gradijent.
+Višestruki pozivi metode <code>backward</code>
+akumuliraju gradijente u atributu <code>grad</code> 
+svakog od tenzora deklariranih s <code>requires_grad=True</code>. 
+Primijetite da slijed poziva <code>y.backward(); s.backward()</code> 
+postiže isti učinak kao i <code>(y + s).backward()</code>.
+
+<p>
+Atribut <code>grad</code> također je primjerak razreda
+<code>torch.Tensor</code>, ali je najčešće odvojen 
+od računskog grafa u kojem je njegov matični tenzor. 
+Računanje viših derivacija možemo postići
+pozivanjem metode <code>backward</code> 
+s argumentom <code>create_graph=True</code>,
+čime se traži da u računski graf uđu i derivacije tenzora.
+
+<p>
+Ako želimo iznova izračunati gradijent 
+(npr. za neki drugi <code>x</code>),
+onda moramo poništiti postojeći gradijent
+kako bismo izbjegli akumuliranje. 
+To možemo postići brisanjem atributa <code>grad</code> 
+postavljanjem npr. <code>a.grad=None</code>.
+<!-- 
+ili, još bolje, s <code>a.grad.detach_(); a.grad.zero_</code>.
+Navedeni slijed prvo odvaja gradijent od tenzora <code>a</code>
+(podvlaka označava operaciju koja mijenja tenzor) 
+kako bi bilo manje alokacija i dealokacija memorije.
+-->
+
+<p>
+Ako nam za neki proračun ne treba izračun gradijenta, 
+dobro je izraziti ga u tijelu 
+upravitelja konteksta <code>torch.no_grad()</code>
+koji isključuje Autograd (tada se PyTorch ponaša kao NumPy). 
+Ovdje je primjer procedure koja računa konfuzijsku 
+matricu na temelju vektora indeksa točnih oznaka <code>y_true</code> 
+i predikcija <code>y_pred</code>
+te vraća konfuzijsku matricu dimenzija 
+<code>class_count</code>×<code>class_count</code>.
+
+<pre><code class="python">import torch.nn.functional as F
+
+def multiclass_confusion_matrix(y_true, y_pred, class_count):
+  with torch.no_grad():
+    y_pred = F.one_hot(y_pred, class_count)
+    cm = torch.zeros([class_count] * 2, dtype=torch.int64, device=y_true.device)
+    for c in range(class_count):
+      cm[c, :] = y_pred[y_true == c, :].sum(0)
+    return cm  
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Ovaj primjer pokazuje da PyTorch omogućuje kopiranje tenzora (i izračuna)
+između različitih platformi/uređaja primjenom 
+opcionalnog argumenta <code>device</code>,
+koji primaju sve funkcije PyTorcha koje stvaraju nove tenzore.
+Primijetite da pri tome tip podatka možemo zadati 
+primjenom opcionalnog argumenta <code>dtype</code>.
+Umjesto pokazanog poziva funkcije <code>torch.zeros</code> 
+mogli bismo navesti i eksplicitnu konverziju
+<code>torch.zeros([class_count] * 2).to(dtype=torch.int64, device=y_true.device)</code>,
+koja bi dala jednak rezultat, ali bi prouzročila nepotrebno stvaranje jednog privremenog tenzora.
+Tipične vrijednosti argumenta <code>device</code> su 
+<code>torch.device('cpu')</code> (glavni procesor i memorija)
+ili <code>torch.device('cuda:0')</code> (prvi GPU pod platformom CUDA).
+Uređaj možemo zadati i znakovnim nizom: 
+<code>device='cpu'</code> ili <code>device='cuda:0'</code>.
+
+<p> 
+Više informacija možete naći u 
+<a href="https://pytorch.org/docs/stable/">službenoj dokumentaciji</a> PyTorcha.
+
+<!-- <p>
+TODO
+- asinkrona evaluacija
+- funkcija autograda -->
+
+
+<h4 id="z0c">0c. Primjena PyTorcha u strojnom učenju</h4>
+
+<p>
+Program koji koristi PyTorch tipično sadrži sljedeće komponente:
+<ol>
+<li>
+  model predstavljen objektom tipa izvedenog iz
+  <code>torch.nn.Module</code>
+  koji tipično sadrži druge module s parametrima,  
+<li>
+  procedure za učitavanje i obradu ulaznih podataka,
+<li>      
+  petlju učenja.
+</ol>
+
+<p>
+Procedure za učitavanje i obradu podataka tipično uključuju:
+<ol>
+<li>
+  skup podataka &#8211; obično objekt tipa izvedenog iz 
+  <code>torch.utils.data.Dataset</code> 
+  <ul>
+  <li>
+    metoda <code>__len__</code> tog objekta
+    tipično vraća broj podataka,
+  <li>
+    metoda <code>__getitem__</code> tog objekta
+    često učitava podatak iz datotečnog sustava
+    zato što svi podatci ne mogu stati u radnu memoriju;
+   </ul>
+  <li>
+    komponente za predobradu podataka na procesoru,
+  <li>
+    komponente za uzorkovanje podataka
+    tj. određivanje redoslijeda učitavanja
+    (<code>torch.utils.data.Sampler</code>),
+  <li>
+    komponentu za paralelno učitavanje i predobradu podataka 
+    (<code>torch.utils.data.DataLoader</code>).
+  </ol>
+
+<p>
+Elementi algoritma učenja tipično uključuju:
+<ol>
+<li>
+  procedure za inicijalizaciju parametara,
+<li>
+  funkciju gubitka,
+<li>
+  optimizacijski algoritam &#8211; 
+  obično objekt tipa izvedenog iz <code>torch.optim.Optimizer</code>,
+<li>
+  petlju za učenje koja pribavlja podatke, računa gradijente gubitka 
+  te primjenjuje korak optimizacije koji ažurira parametre.
+</ol>
+
+<p>
+Sljedeći kod prikazuje primjer modela 
+koji obavlja afinu transformaciju:
+<pre><code class="python">import torch
+
+class Affine(torch.nn.Module):
+  def __init__(self, in_features, out_features):
+    super().__init__()
+    self.out_features = out_features
+    self.linear = torch.nn.Linear(in_features, out_features, bias=False)
+    self.bias = torch.nn.Parameter(torch.zeros(out_features))
+
+  def forward(self, input):
+    return self.linear(input) + self.bias
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Prikazani primjer sadrži podmodel tipa <code>torch.nn.Linear</code> 
+(koji već sam po sebi podržava pomak, ali to radi primjera ne koristimo)
+i parametar tipa <code>torch.nn.Parameter</code>. 
+Tip <code>torch.nn.Parameter</code>
+je izveden iz <code>torch.Tensor</code> i uglavnom služi 
+za razlikovanje parametara od drugih tenzora
+(atribut <code>requires_grad</code> 
+ podrazumijevano se postavlja na <code>True</code>).
+<!-- nebitno? 
+Razred <code>torch.nn.Module</code> 
+ima posebno definiranu metodu 
+<code>__setattr__(self, name, value)</code> 
+koja se poziva pri postavljanju atributa kodom oblika <code>self.bias = b</code> 
+ili <code>setattr(self, 'bias', b)</code> i u njoj razvrstava atribute u riječnike kao što su
+<code>_modules</code> (moduli djeca), <code>_parameters</code> (parametri)
+ili <code>_buffers</code> (ostali tenzori).
+<code>modules</code> rekurzivno obilazi i vraća sve podmodule, 
+--> 
+Razred <code>torch.nn.Module</code> 
+definira metode koje vraćaju iteratore 
+po modulima (<code>modules</code>), 
+po podmodulima (<code>children</code>),
+parametrima (<code>parameters</code>) itd.
+Metode s prefiksom <code>named_</code> vraćaju 
+parove imena (putova) i objekata,
+kao što pokazuje sljedeći primjer:
+<pre><code class="python">>>> affine = Affine(3, 4)
+>>> print(list(affine.named_parameters()))
+[('bias',
+  Parameter containing:
+  tensor([0.000, 0.000, 0.000], requires_grad=True)),
+ ('linear.weight',
+  Parameter containing:
+  tensor([[-0.2684,  0.2126, -0.4430],
+          [ 0.3446, -0.2018, -0.4346],
+          [-0.4756, -0.3453,  0.1401],
+          [ 0.3257,  0.0911, -0.1267]], requires_grad=True))]
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Module obično oblikujemo tako da mogu raditi 
+nad mini-grupama podataka. 
+Primjerice, poziv
+<code>affine(torch.randn(5, 3))</code>
+rezultira tenzorom dimenzija (5, 4),
+pri čemu <code>torch.randn(5, 3)</code>
+stvara matricu slučajnih normalno distribuiranih elemenata.
+
+<!--
+<p>
+Kao i tenzori, moduli isto imaju metodu <code>to</code> kojom se mogu svi parametri (i drugi tenzori) prebaciti 
+u drugi tip ili na drugi uređaj. 
+Imaju i metode <eval>train</eval> i <eval>eval</eval> koje mijenjaju
+stanje podmodula koji se trebaju drugačije ponašati tijekom učenja i evaluacije.
+-->
+
+<p>
+Više o modulima se može naći u <a href="https://pytorch.org/docs/stable/nn.html">službenoj dokumentaciji</a>.
+Različite procedure za inicijalizaciju parametara su u paketu <code>torch.nn.init</code>. 
+
+<p>
+Sljedeći primjer demonstrira osnove učitavanja podataka:
+<pre><code class="python">import numpy as np
+import torch
+from torch.utils.data import DataLoader
+
+dataset = [(torch.randn(4, 4), torch.randint(5, size=())) for _ in range(25)]
+dataset = [(x.numpy(), y.numpy()) for x, y in dataset]
+loader = DataLoader(dataset, batch_size=8, shuffle=False, 
+                    num_workers=0, collate_fn=None, drop_last=False)
+for x, y in loader:
+  print(x.shape, y.shape)
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Primjer prvo generira slučajan skup od 25 
+slučajnih parova matrica 4x4 i skalara. 
+Podatci se iz demonstrativnih razloga 
+bez kopiranja prebacuju u tip <code>numpy.ndarray</code> 
+pozivanjem metode <code>numpy</code>. 
+Skup podataka predaje se konstruktoru razreda <code>DataLoader</code> 
+čiji primjerak ostvaruje iteriranje po mini-grupama. 
+Slijede neki bitniji argumenti koje prima konstruktor. 
+Argument <code>batch_size</code> je veličina mini-grupe. 
+Argument <code>shuffle</code> je logička vrijednost 
+koja određuje hoće li se prije svakog prolaza
+odabrati nasumični redoslijed. 
+Argument <code>num_workers</code> je broj paralelnih procesa za učitavanje podataka. 
+Argument <code>collate_fn</code> je funkcija koja iz pojedinih podataka slaže mini-grupe. 
+U podrazumijevanom slučaju <code>collate_fn=None</code> 
+poziva se funkcija <code>torch.as_tensor</code>, 
+što NumPyjev niz bez kopiranja pretvara u <code>torch.Tensor</code>.
+Argument <code>drop_last</code> je Booleova vrijednost
+koja određuje hoće li se ispustiti zadnja 
+mini-grupa ako je preostalo manje ods
+ <code>batch_size</code> elemenata za zadnu mini-grupu.
+U prikazanom slučaju program će 3 puta ispisati
+<code>torch.Size([8, 4, 4]) torch.Size([8])</code> 
+i jednom <code>torch.Size([1, 4, 4]) torch.Size([1])</code>. 
+Više o učitavanju podataka se može naći u 
+<a href="https://pytorch.org/docs/stable/nn.html">službenoj dokumentaciji</a>.
+
+<p>
+Sljedeća procedura opisuje primjer iteracije 
+kod nadziranog učenja:
+<pre><code class="python">def supervised_training_step(ctx, x, y):
+  ctx.model.train()  # postavljanje modela u stanje za učenje
+  output = ctx.model(x)  # unaprijedni prolaz
+  loss = ctx.loss(output, y).mean()  # izračun gubitka
+
+  ctx.optimizer.zero_grad()  # postavljanje gradijenta u 0
+  loss.backward()  # unatražni prolaz
+  ctx.optimizer.step()  # primjena koraka optimizacije
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+<code>ctx</code> je pristupni objekt koji obuhvaća 
+model <code>model</code>,
+funkciju gubitka <code>loss</code> i 
+optimizacijski algoritam <code>optimizer</code>. 
+<code>x</code> i <code>y</code> su ulazna i izlazna mini-grupa.
+Prvo se model postavlja u stanje za učenje 
+jer može sadržavati module kao što su dropout ili normalizacija po podacima 
+koji se pri učenju različito ponašaju nego kod evaluacije. 
+Zatim se u unaprijednom prolazu računaju izlaz modela 
+i srednji gubitak na mini-grupi. 
+Nakon toga slijedi korak optimizacije. 
+Objekt <code>optimizer</code> je tipa izvedenog iz <code>torch.optim.Optimizer</code> 
+te referencira parametre.
+
+<p>
+Ovako izgleda jednostavan primjer stvaranja optimizatora:
+<pre><code class="python">from torch.optim import SGD
+optimizer = SGD(model.parameters(), lr=1e-2, weight_decay=1e-4)
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Osnovni argumenti su parametri i 
+veličina optimizacijskog koraka <code>lr</code>.
+Radi efikasnosti, PyTorch nudi mogućnost provođenja 
+L2 regularizacije izravno u optimizatoru. 
+Zbog toga se u konstruktoru pojavljuje argument <code>weight_decay</code>.
+Glavne metode optimizatora su <code>zero_grad</code> i <code>step</code>.
+Metodu <code>zero_grad</code> treba pozvati 
+prije svakog računanja gradijenta ako ga ne želimo akumulirati.
+Metoda <code>step</code> izvršava korak optimizacije. 
+U slučaju gradijentnog spusta, 
+ta metoda umanjuje sve parametre
+za odgovarajući gradijent 
+pomnožen veličinom koraka.
+
+Više o optimizatorima se može naći u 
+<a href="https://pytorch.org/docs/stable/optim.html">službenoj dokumentaciji</a>.
+
+
+<h4 id="z1">1. Generiranje linearno nerazdvojivih podataka</h4>
+
+<p>
+Rješenje ove vježbe slobodno preuzmite ovdje:
+<a href="src/data.py">data.py</a>.
+
+<p>
+U dosadašnjim eksperimentima
+logistička regresija je postizala
+iznimno dobre klasifikacijske rezultate.
+To nije nikakvo čudo jer se pokazuje da 
+aposteriorna vjerojatnost razreda podataka 
+generiranih Gaussovim razdiobama s dijeljenom kovarijancom 
+odgovara upravo sigmoidi afino transformiranih podataka.
+Istina, u našim smo eksperimentima mrvicu odstupili
+od teoretskih pretpostavki 
+(naši razredi su imali različite kovarijance),
+ali rezultati pokazuju da to odstupanje nije bilo presudno.
+Sada ćemo situaciju malo otežati 
+na način da pozitivne i negativne podatke
+generiramo nešto složenijim generativnim modelom.
+
+<p>
+Upute:
+<ul>
+<li>
+  Napišite potprogram <code>sample_gmm_2d(K, C, N)</code>
+  koja stvara <code>K &ge; C</code> slučajnih
+  bivarijatnih Gaussovih razdioba,
+  te iz svake od njih uzorkuje <code>N</code> podataka.
+  Za razliku od funkcije <code>sample_gauss_2d</code>
+  ovdje svakoj bivarijatnoj razdiobi G<sub>i</sub>
+  trebamo pridružiti razred c<sub>i</sub>
+  koji slučajno biramo iz skupa {0, 1, ..., C-1}.
+  Na taj način dobivamo podatkovne razrede generirane
+  mješavinama slučajno odabranih Gaussovih razdioba.
+  Kao i ranije, funkcija treba vratiti matricu <code>X</code>
+  čiji retci odgovaraju uzorkovanim podatcima
+  te matricu <code>Y</code> čiji jedini stupac sadrži
+  indeks razreda odgovarajućeg podatka.
+<li>
+  U izvedbi potprograma potrebno je prvo
+  instancirati slučajne distribucije
+  i svakoj od njih dodijeliti slučajan razred
+  od <code>0</code> do <code>C - 1</code>.
+  Zatim je potrebno iz svake distribucije 
+  uzorkovati traženi broj podataka. 
+  Svi podatci uzorkovani iz iste distribucije
+  trebaju dobiti indeks razreda koji je 
+  dodijeljen toj distribuciji.
+<li>
+  Potprogram treba vratiti sljedeće podatke:
+<pre><code class="python">'''
+  X  ... podatci u matrici [K·N x 2 ]
+  Y_ ... indeksi razreda podataka [K·N]
+'''
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+</ul>
+  
+<p>
+Izvedite potprogram <code>sample_gmm_2d</code>
+te ga ispitajte uz pomoć prethodno razvijenih
+potprograma za crtanje 
+(<code>graph_surface</code> i <code>graph_data</code>). 
+Ovisno o parametrima i stanju generatora slučajnih brojeva,
+vaš rezultat mogao bi izgledati kao na sljedećoj slici.
+Naši parametri bili su 
+ <code>K=4</code>, 
+ <code>C=2</code>, 
+ <code>N=30</code>.
+
+<p>
+<img src="figures/data_gmm.png" alt="data">
+
+<p>
+Ako je rezultat izvođenja prihvatljiv,
+pohranite kod u datoteku <code>data.py</code>.
+
+<h4 id="z2">2. Višeslojna klasifikacija u NumPyju (20% bodova)</h4>
+
+<p>
+Oblikujte i izvedite modul <code>fcann2</code>
+za rad s probabilističkim klasifikacijskim modelom
+s jednim skrivenim slojem prema uputama iz odjeljka
+<a href="#z0a">0a</a>.
+Neka organizacija vašeg koda bude sukladna 
+organizaciji modula <code>logreg</code>
+iz prethodne vježbe.
+Napišite metode <code>fcann2_train</code>,
+<code>fcann2_classify</code>.
+Isprobajte njihov rad na umjetnom skupu
+2D podataka dvaju razreda dobivenih
+iz Gaussove mješavine od 6 komponenata.
+
+<p>
+Ovisno o parametrima i stanju generatora slučajnih brojeva,
+vaš rezultat mogao bi izgledati kao na sljedećoj slici.
+Naši parametri bili su:
+ <code>K=6</code>, 
+ <code>C=2</code>, 
+ <code>N=10</code>,
+ <code>param_niter=1e5</code>,
+ <code>param_delta=0.05</code>,
+ <code>param_lambda=1e-3</code> (koeficijent regularizacije),
+ dimenzija skrivenog sloja: 5.
+
+<p>
+<img src="figures/graph_surface_gmm_ann.png" alt="data">
+
+<p>
+Ako je rezultat prihvatljiv, pohranite kod
+u datoteku <code>fcann2.py</code>.
+
+
+<h4 id="z3">3. Linearna regresija u PyTorchu (10% bodova)</h4>
+
+<p>
+Jednostavan primjer implementacije algoritma strojnog učenja
+u PyTorchu prikazat ćemo na potpunom primjeru
+optimizacijskog postupka za određivanje parametara
+pravca <code>y = a * x + b</code>
+koji prolazi kroz točke 
+<code>(1,3)</code> i <code>(2,5)</code>.
+
+<pre><code class="python">import torch
+import torch.nn as nn
+import torch.optim as optim
+
+
+## Definicija računskog grafa
+# podaci i parametri, inicijalizacija parametara
+a = torch.randn(1, requires_grad=True)
+b = torch.randn(1, requires_grad=True)
+
+X = torch.tensor([1, 2])
+Y = torch.tensor([3, 5])
+
+# optimizacijski postupak: gradijentni spust
+optimizer = optim.SGD([a, b], lr=0.1)
+
+for i in range(100):
+    # afin regresijski model
+    Y_ = a*X + b
+
+    diff = (Y-Y_)
+
+    # kvadratni gubitak
+    loss = torch.sum(diff**2)
+
+    # računanje gradijenata
+    loss.backward()
+
+    # korak optimizacije
+    optimizer.step()
+
+    # Postavljanje gradijenata na nulu
+    optimizer.zero_grad()
+
+    print(f'step: {i}, loss:{loss}, Y_:{Y_}, a:{a}, b {b}')
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Zadatci:
+<ul>
+<li>
+  Ponovite osnove PyTorcha 
+  navedene u odjeljcima
+  <a href="#z0b">0b</a> i
+  <a href="#z0c">0c</a>.
+  Analizirajte prikazani program
+  te provjerite ispravnost izvođenja.
+<li>
+  Modificirajte program na način
+  da se pravac može provući kroz
+  proizvoljan broj točaka.
+  Pripazite da iznosi gradijenata
+  budu neovisni o broju podataka.
+<li>
+  Ispišite vrijednosti gradijenata
+  tijekom napredovanja postupka.
+<li>
+  Odredite analitičke izraze za
+  gradijente funkcije gubitka po parametrima
+  <code>a</code> i <code>b</code>.
+  Izračunajte eksplicitno te gradijente.
+  Ispišite vrijednosti gradijenata i uvjerite se
+  da odgovaraju onima koje automatski određuje PyTorch.
+</ul>
+
+<p>
+Ako je rezultat prihvatljiv, pohranite kod
+u datoteku <code>pt_linreg.py</code>.
+
+<h4 id="z4">4. Logistička regresija u PyTorchu (20% bodova)</h4>
+
+<p>
+U ovom zadatku ćemo postupak logističke regresije
+izvesti uz pomoć PyTorcha.
+Dobiveni kod će biti oko dvostruko kraći
+od "ručnog rada" koji je bio predmet nulte vježbe.
+Glavne prednosti PyTorcha su u tome
+što ne moramo izvoditi gradijente te 
+što se dobiveni program bez ikakvih izmjena
+može izvršavati na moćnim grafičkim karticama.
+Te prednosti će se pokazati presudnima kod velikih modela
+sa stotinama milijuna slobodnih parametara
+(kod malih modela procesori opće namjene
+ mogu biti brži od grafičkih procesora
+ zbog dugotrajnog prebacivanja podataka).
+
+<p>
+U PyTorchu model obično izražavamo 
+nasljeđivanjem osnovnog razreda <code>torch.nn.Module</code>.
+Pritom je potrebno definirati konstruktor i 
+funkciju <code>forward</code> koja predstavlja 
+unaprijedni prolaz kroz model.
+Tenzore koji predstavljaju parametre modela 
+kao atribute tipa <code>torch.nn.Parameter</code>.
+To nam omogučava jednostavan 
+pristup parametrima modela korištenjem
+funkcije <code>torch.nn.Module.parameters()</code>.
+Modul za učenje logističke regresije bi mogao 
+izgledati ovako:
+<pre><code class="python">class PTLogreg(nn.Module):
+  def __init__(self, D, C):
+    """Arguments:
+       - D: dimensions of each datapoint 
+       - C: number of classes
+    """
+
+    # inicijalizirati parametre (koristite nn.Parameter):
+    # imena mogu biti self.W, self.b
+    # ...
+
+  def forward(self, X):
+    # unaprijedni prolaz modela: izračunati vjerojatnosti
+    #   koristiti: torch.mm, torch.softmax
+    # ...
+
+  def get_loss(self, X, Yoh_):
+    # formulacija gubitka
+    #   koristiti: torch.log, torch.exp, torch.sum
+    #   pripaziti na numerički preljev i podljev
+    # ...
+
+
+def train(model, X, Yoh_, param_niter, param_delta):
+  """Arguments:
+     - X: model inputs [NxD], type: torch.Tensor
+     - Yoh_: ground truth [NxC], type: torch.Tensor
+     - param_niter: number of training iterations
+     - param_delta: learning rate
+  """
+  
+  # inicijalizacija optimizatora
+  # ...
+
+  # petlja učenja
+  # ispisujte gubitak tijekom učenja
+  # ...
+
+
+def eval(model, X):
+  """Arguments:
+     - model: type: PTLogreg
+     - X: actual datapoints [NxD], type: np.array
+     Returns: predicted class probabilites [NxC], type: np.array
+  """
+  # ulaz je potrebno pretvoriti u torch.Tensor
+  # izlaze je potrebno pretvoriti u numpy.array
+  # koristite torch.Tensor.detach() i torch.Tensor.numpy()
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Primijetite da, za razliku od prethodne vježbe,
+točne oznake razreda podataka za učenje
+sada nazivamo <code>Yoh_</code> umjesto <code>Y_</code>.
+Razlog tome je što unakrsnu entropiju
+lakše izražavamo kad su oznake smještene u matrici
+gdje retci odgovaraju podatcima, a stupci razredima
+(tzv. one-hot notacija).
+Ako podatak <code>x_i</code> 
+odgovara razredu <code>c_j</code>,
+onda vrijedi <code>Yoh_[i,j] = 1</code> te 
+<code>Yoh_[i,k] = 0</code> za <code>k!=j</code> ("one hot").
+Podsjetimo se, tako organizirane oznake razreda
+u ranijim matematičkim izrazima nazivali smo
+matricom vektorski kodiranih oznaka \(\mathbf{Y'}\).
+
+<p>
+Struktura ispitnog programa bila bi vrlo slična
+ispitnim programima iz prethodne vježbe:
+<pre><code class="python">if __name__ == "__main__":
+  # inicijaliziraj generatore slučajnih brojeva
+  np.random.seed(100)
+
+  # instanciraj podatke X i labele Yoh_
+
+  # definiraj model:
+  ptlr = PTLogreg(X.shape[1], Yoh_.shape[1])
+
+  # nauči parametre (X i Yoh_ moraju biti tipa torch.Tensor):
+  train(ptlr, X, Yoh_, 1000, 0.5)
+
+  # dohvati vjerojatnosti na skupu za učenje
+  probs = eval(ptlr, X)
+
+  # ispiši performansu (preciznost i odziv po razredima)
+
+  # iscrtaj rezultate, decizijsku plohu
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Zadatci:
+<ul><li>
+  Dopunite izvedbu razreda <code>PTLogreg</code>.
+  Provjerite postiže li vaš program iste rezultate
+  kao i odgovarajući program iz nulte vježbe
+  za slučajeve dva i tri razreda podataka.
+  Pripazite na to da gubitak karakterizirate tako
+  da ne ovisi o broju podataka za učenje 
+  (tako je lakše interpretirati iznos gubitka 
+   te validirati korak učenja).
+<li>  
+  Dodajte regularizaciju na način da gubitak formulirate
+  kao zbroj unakrsne entropije i 
+  L2 norme vektorizirane matrice težina
+  pomnožene hiperparametrom <code>param_lambda</code>.
+  Ispitajte utjecaj regularizacije na oblik predikcijske plohe.
+<li>
+  Eksperimentirajte s različitim vrijednostima hiperparametara. 
+  Pronađite kombinacije hiperparametara 
+  za koje vaš program ne uspijeva pronaći 
+  zadovoljavajuće rješenje i pokušajte objasniti što se događa.
+</ul>
+
+<p>
+Ako je rezultat izvođenja prihvatljiv,
+pohranite kod u datoteku <code>pt_logreg.py</code>.
+
+
+<h4 id="z5">5. Konfigurabilni duboki modeli u PyTorchu (20% bodova)</h4>
+<p>
+Naš sljedeći zadatak je proširiti izvedbu logističke regresije
+na način da omogućimo jednostavno zadavanje 
+potpuno povezanih modela proizvoljne dubine.
+Nazovimo naš novi razred <code>PTDeep</code>.
+Neka sučelje tog razreda bude posve identično
+sučelju razreda <code>PTLogreg</code>,
+osim što ćemo u konstruktoru
+umjesto dimenzionalnosti podataka i broja razreda
+zadati listu cijelih brojeva koji će
+određivati broj neurona u svakom sloju.
+Dodatno, u konstruktoru ćemo zadati i aktivacijsku funkciju
+za skrivene slojeve dubokog modela.
+Nulti element te konfiguracijske liste određuje
+dimenzionalnost podataka, 
+dok njen posljednji element 
+(na rednom broju <code>n-1</code>)
+odgovara broju razreda.
+Elementi konfiguracije na indeksima od <code>1</code> 
+do <code>n-2</code> (ako postoje)
+sadržavaju brojeve neurona u skrivenim slojevima.
+Tako konfiguracija <code>[2, 3]</code> 
+odgovara logističkoj regresiji
+dvodimenzionalnih podataka u tri razreda.
+Konfiguracija <code>[2,5,3]</code> odgovara 
+modelu s jednim skrivenim slojem <code>h</code>
+koji se sastoji od 5 neurona:
+<pre><code class="python hljs">h = f (X * W_1 + b_1)
+probs = softmax(h * W_2 + b_2) 
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+<p>
+U posljednjem primjeru dimenzije čvorova grafa
+trebaju biti kako slijedi
+(upitnici označavaju nepoznatu brojnost
+ skupa podataka na kojem primijenjujemo model):
+<pre>
+  X     ... [?, 2]
+  W_1   ... [2, 5]
+  b_1   ... [1, 5]
+  h_1   ... [?, 5]
+  W_2   ... [5, 3]
+  b_2   ... [1, 3]
+  probs ... [?, 3]
+</pre>
+<p>
+Implementacija razreda <code>PTDeep</code>
+bit će vrlo slična implementaciji
+razreda <code>PTLogreg</code>.
+U konstruktoru moramo inicijalizirati 
+matrice težina i vektora pomaka.
+S obzirom na to da broj slojeva može biti različit,
+matrice težina i vektore pomaka
+trebat će smjestiti u liste
+(nazovimo ih <code>self.weights</code> i <code>self.biases</code>).
+Slično kao u prethodnom zadatku,
+kako bismo iskoristili sve mogućnosti
+nadrazreda <code>torch.nn.Module</code>
+atribut koji predstavlja listu parametara
+treba biti tipa
+<code>torch.nn.ParameterList</code>,
+dok članovi te kolekcije trebaju biti tipa
+<code>torch.nn.Parameter</code>.
+Nelinearnost u skrivenim slojevima 
+možete izraziti uz pomoć
+funkcija <code>torch.relu</code>,
+<code>torch.sigmoid</code> odnosno <code>torch.tanh</code>.
+<br>
+<br>
+<b>Napomena</b>: PyTorch sadrži i razrede za potpuno povezani sloj <code>torch.nn.Linear</code> 
+i unaprijedni model zadan nizom slojeva <code>torch.nn.Sequential</code>. 
+Ipak, iz edukativnih razloga zadatak ćemo riješiti na već opisani način.
+Znatiželjni dodatno mogu zadatak riješiti korištenjem gotovih razreda.
+
+<p>
+Zadatci:
+<ul>
+<li>
+  Izvedite razred <code>PTDeep</code>
+  te isprobajte konfiguraciju [2, 3]
+  na istim podatcima kao i u prethodnom zadatku
+  (ispitni program će vam biti vrlo sličan).
+  Provjerite da su rezultati isti kao i ranije.
+<li>
+  Napišite metodu <code>count_params</code>
+  koja će ispisati simboličko ime i dimenzije
+  tenzora svih parametara.
+  Dodatno, neka funkcija računa i
+  ukupan broj parametara modela
+  (npr. za konfiguraciju [2, 3] rezultat bi trebao biti 9).
+  Za obilazak svih parametara modela sada elegantno
+  možemo koristiti iterator 
+  <a href="https://pytorch.org/docs/stable/nn.html#torch.nn.Module.named_parameters">named_parameters</a>.
+<li>
+  Isprobajte vaš kod na podatcima dobivenim pozivima
+  <code>data.sample_gmm_2d(4, 2, 40)</code> i
+  <code>data.sample_gmm_2d(6, 2, 10)</code>,
+  za konfiguracije [2, 2], [2, 10, 2] i [2, 10, 10, 2].
+  Ispišite točnost, odziv, preciznost i prosječnu preciznost
+  te grafički prikažite rezultate klasifikacije
+  i izgled decizijske plohe.
+  Ako ne dođe do konvergencije, obratite pažnju
+  na vrijednosti hiperparametara.
+<li>
+  Usporedite rezultate s onim što se zbiva
+  kad za prijenosnu funkciju postavite sigmoidu.
+  Sigmoida bi za ovakve male probleme 
+  zbog neprekidnosti trebala
+  postići bolje rezultate od zglobnice.
+  Glavna prednost zglobnice je u tome što nema zasićenje 
+  pa kod dubljih modela gradijenti teže nestaju. 
+</ul>
+
+<p>
+Ovisno o parametrima i stanju generatora slučajnih brojeva,
+vaš rezultat mogao bi izgledati kao na sljedećoj animaciji
+(naši parametri bili su:
+ <code>K=6</code>, 
+ <code>C=2</code>, 
+ <code>N=10</code>,
+ <code>param_niter=1e4</code>,
+ <code>param_delta=0.1</code>,
+ <code>param_lambda=1e-4</code> (koeficijent regularizacije),
+ <code>config=[2, 10, 10, 2]</code>, ReLU).
+
+<p>
+<img src="figures/graph_surface_gmm_gd.gif" alt="data">
+
+<!--
+<p>
+Zanimljivo je usporediti dobiveni animirani prikaz
+s prikazom napredovanja programa
+u kojem je zadan različiti optimizacijski postupak.
+Usporedba pokazuje da postupci mogu napredovati
+prema različitim lokalnim minimumima funkcije cilja.
+Međutim, kapacitet dubokog modela
+je toliko veliki da je to manje bitno:
+prikazana rješenja odgovaraju
+otprilike istoj vrijednosti funkcije cilja
+te otprilike isti AP na skupu za učenje.
+Rezultati su u skladu s dominantnim vjerovanjem
+da krajobraz funkcija gubitka dubokih modela
+u pravilu ima više lokalnih minimuma
+koji su otprilike jednako dobri
+u smislu postignute performanse.
+
+<p>
+<img src="figures/graph_surface_gmm_adam.gif" alt="data">
+-->
+
+<p>
+Ako je rezultat izvođenja prihvatljiv,
+vaš kod pohranite u datoteku <code>pt_deep.py</code>.
+
+<h4 id="z6">6. Usporedba s jezgrenim SVM-om (10% bodova)</h4>
+
+<p>
+Podsjetite se na svojstva jezgrenog SVM-a
+(model, gubitak, optimizacija)
+te pročitajte dokumentaciju modula <code>svm</code>
+biblioteke <code>scikit-learn</code>.
+Oblikujte razred <code>KSVMWrap</code>
+kao tanki omotač oko modula <code>sklearn.svm</code>
+kojeg ćemo moći primijeniti na našim dvodimenzionalnim podatcima.
+S obzirom na to da će omotač biti jednostavan,
+učenje možemo provesti iz konstruktora
+dok predikciju razreda, dohvat klasifikacijskih mjera 
+(potrebne za prosječnu preciznost)
+i dohvat potpornih vektora možemo izvesti u metodama.
+Neka sučelje razreda bude kako slijedi:
+<pre><code class="python">'''
+Metode:
+  __init__(self, X, Y_, param_svm_c=1, param_svm_gamma='auto'):
+    Konstruira omotač i uči RBF SVM klasifikator
+    X, Y_:           podatci i točni indeksi razreda
+    param_svm_c:     relativni značaj podatkovne cijene
+    param_svm_gamma: širina RBF jezgre
+
+  predict(self, X)
+    Predviđa i vraća indekse razreda podataka X
+
+  get_scores(self, X):
+    Vraća klasifikacijske mjere
+    (engl. classification scores) podataka X;
+    ovo će vam trebati za računanje prosječne preciznosti.
+
+  support
+    Indeksi podataka koji su odabrani za potporne vektore
+'''
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Zadatci:
+<ul>
+<li>
+  Modificirajte funkciju <code>data.graph_data</code>
+  na način da joj dodate argument <code>special</code>.
+  Argument <code>special</code> zadaje listu indeksa podataka 
+  koje prilikom iscrtavanja treba posebno naglasiti
+  udvostručavanjem veličine njihovih simbola.
+<li>
+  Isprobajte vaš razred na podacima dvaju razreda
+  uzorkovanih iz mješavina Gaussovih distribucija.
+  Kao i obično, ispišite pokazatelje performanse
+  (točnost, odziv, preciznost, prosječnu preciznost).
+<li>
+  Usporedite performansu modela koje implementiraju razredi
+  <code>PTDeep</code> i <code>KSVMWrap</code> 
+  na većem broju slučajnih skupova podataka.
+  Koje su prednosti i nedostatci njihovih funkcija gubitka?
+  Koji od dvaju postupaka daje bolju garantiranu performansu?
+  Koji od postupaka može primiti veći broj parametara?
+  Koji bi od postupaka bio prikladniji 
+  za 2D podatke uzorkovane 
+  iz mješavine Gaussovi distribucija?
+<li>
+  Iscrtajte decizijsku plohu i rezultate klasifikacije RBF SVM-a.
+  Iskoristite argument <code>special</code>
+  funkcije <code>data.graph_data</code>
+  da u prikazu podataka posebno istaknete potporne vektore.
+  Ovisno o parametrima i stanju generatora slučajnih brojeva,
+  vaš rezultat mogao bi izgledati kao na sljedećoj animaciji
+  (naši parametri bili su:
+   <code>K=6</code>, 
+   <code>C=2</code>,
+   <code>N=10</code>,
+   <code>param_svm_c=1</code>, 
+   <code>param_svm_gamma='auto'</code>).
+</ul>
+
+<p>
+<img src="figures/graph_surface_svm.png" alt="data">
+
+<p>
+Ako je rezultat izvođenja prihvatljiv,
+pohranite kod u datoteku <code>ksvm_wrap.py</code>.
+
+<h4 id="z7">7. Studija slučaja: MNIST (20% bodova)</h4>
+
+<p>
+U dosadašnjim vježbama naučene modele
+nismo evaluirali na nezavisnom skupu za testiranje.
+Takvi eksperimenti ne bi nužno otkrili
+generalizacijski potencijal algoritama,
+jer se generativni modeli stvarnih podataka
+ne moraju moći opisati Gaussovim razdiobama.
+Zato ćemo se u ovoj vježbi posvetiti
+generalizacijskoj performansi
+na stvarnom skupu podataka MNIST.
+
+<p>
+MNIST predstavlja skup slika
+rukom pisanih znamenki od 0 do 9.
+Svaka znamenka predstavljena je slikom 
+dimenzija 28x28 piksela.
+MNIST sadrži 60000 slika u skupu za učenje,
+i 10000 slika u skupu za testiranje.
+MNIST možemo jednostavno učitati sljedećim kodom:
+<pre><code class="python hljs">import torch
+import torchvision
+
+dataset_root = '/tmp/mnist'  # change this to your preference
+mnist_train = torchvision.datasets.MNIST(dataset_root, train=True, download=True)
+mnist_test = torchvision.datasets.MNIST(dataset_root, train=False, download=True)
+
+x_train, y_train = mnist_train.data, mnist_train.targets
+x_test, y_test = mnist_test.data, mnist_test.targets
+x_train, x_test = x_train.float().div_(255.0), x_test.float().div_(255.0)
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+Ovaj pristup za preuzimanje podatkovnog skupa MNIST
+ponekad će završiti greškom 503.
+Ako se to dogodi, predlažemo
+sljedeću alternativnu proceduru:
+<ol><li>
+  ručno downloadati MNIST s alternativnih stranica
+  <ul><li>
+    npr. git clone https://github.com/knamdar/data.git
+  </ul>
+<li>
+  postaviti dataset_root na kazalo koje sadrži kazalo MNIST
+  <ul><li>
+    npr. dataset_root = ".../data"
+  </ul>
+<li>
+  instancirati skup za učenje:
+  <ul><li>
+    torchvision.datasets.MNIST(dataset_root, train=True, download=False)
+  </ul>
+<li>
+  jednako za skup za testiranje.
+</ol>
+
+<p>
+Sada su skupovi slika i indeksi razreda
+predstavljeni PyTorchevim tenzorima
+<code>x_train</code>,
+<code>y_train</code>,
+<code>x_test</code> i
+<code>y_test</code>.
+Do dimenzija podataka i broja razreda
+možemo doći jednostavnim propitivanjem oblika tih matrica.
+<pre><code class="python hljs">N = x_train.shape[<span class="hljs-number">0</span>]
+D = x_train.shape[<span class="hljs-number">1</span>] * x_train.shape[<span class="hljs-number">2</span>]
+C = y_train.max().add_(1).item()
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Pojedinačne slike možemo prikazati
+pozivom funkcije <code>plt.imshow</code>
+pri čemu preporučamo koristiti argument
+<code>cmap = plt.get_cmap('gray')</code>.
+
+<p> 
+Zadatci:
+<ul>
+<li>
+  Za model konfiguracije [784, 10]
+  iscrtajte i komentirajte naučene matrice težina
+  za svaku pojedinu znamenku.
+  Ponovite za različite iznose regularizacije.
+<li>
+  Naučite duboke modele s konfiguracijama
+  [784, 10], [784, 100, 10],
+  [784, 100, 100, 10] i [784, 100, 100, 100, 10].
+  Ako nemate funkcionalan GPU ne morate provoditi 
+  eksperimente s posljednje dvije konfiguracije.
+  Nakon svake epohe učenja pohranite gubitak.
+  Obratite pažnju na to da će dublji modeli
+  bolje konvergirati s više iteracija s manjim korakom.
+  Usporedite modele s obzirom na kretanje gubitka kroz epohe
+  te pokazatelje performanse (točnost, preciznost, odziv)
+  na skupovima za učenje i testiranje.
+  Za najuspješniji model iscrtajte podatke
+  koji najviše doprinose funkciji gubitka.
+<li>
+  Proučite utjecaj regularizacije na performansu
+  dubokih modela na skupovima za učenje i testiranje.
+<li>
+  Slučajno izdvojite 1/5 podataka
+  iz skupa za učenje u skup za validaciju.
+  Tijekom treniranja evaluirajte validacijsku performansu
+  nakon završetka petlje po grupama podataka
+  te na kraju vratite model s najboljom 
+  validacijskom performansom (engl. early stopping).
+  Procijenite postignuti utjecaj na 
+  konačnu vrijednost funkcije cilja
+  i generalizacijsku performansu.
+<li>
+  Implementirajte stohastički gradijentni spust
+  odnosno postupak učenja po mini-grupama.
+  Prije svake epohe izmiješajte podatke,
+  zatim ih podijelite u n grupa (engl. mini-batch) 
+  i onda provedite korak učenja
+  za svaku grupu posebno.
+  Pripazite na to da gubitak karakterizirate tako
+  da ne ovisi o veličini grupe jer je tako lakše
+  interpretirati iznos gubitka te validirati korak učenja.
+  Vaš kod pohranite u metodi <code>train_mb</code>.
+  Procijenite utjecaj na kvalitetu konvergencije
+  i postignutu performansu 
+  za najuspješniju konfiguraciju iz prethodnog zadatka.
+
+  Napomena: u svrhu razumijevanja postupka učenja po mini-grupama,
+  u ovoj vježbi nije dozvoljeno korištenje razreda 
+  <a href="https://pytorch.org/docs/stable/data.html?highlight=dataloader#torch.utils.data.DataLoader"><code>torch.utils.data.DataLoader</code></a>.
+<li>
+  Promijenite optimizator u
+  <a href="https://pytorch.org/docs/stable/optim.html?highlight=adam#torch.optim.Adam"><code>torch.optim.Adam</code></a>
+  s fiksnim korakom učenja <code>1e-4</code>.
+  procijenite utjecaj te promjene na
+  kvalitetu konvergencije i postignutu performansu.
+<li>
+  Isprobajte ADAM s varijabilnim korakom učenja.
+  U izvedbi se pomognite funkcijom
+  <a href="https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate"><code>torch.optim.lr_scheduler.ExponentialLR</code></a>,
+  koju valja pozvati nakon svake epohe
+  kao što je preporučeno u 
+  <a href="https://pytorch.org/docs/stable/optim.html#torch.optim.lr_scheduler.StepLR">dokumentaciji</a>.
+  Neka početni korak učenja bude isti kao i ranije,
+  a ostale parametre postavite na
+  <code>gamma=1-1e-4</code>.
+<li>
+  Izračunajte i interpretirajte gubitak
+  slučajno incijaliziranog modela
+  (dakle, modela koji nije vidio podatke za učenje).
+<li>
+  Naučite linearni i jezgreni SVM uz pomoć modula
+  <code>sklearn.svm</code>.
+  Koristite podrazumijevano one vs one proširenje
+  SVM-a za klasificiranje podataka u više razreda.
+  Pri eksperimentiranju budite strpljivi
+  jer bi učenje i evaluacija mogli trajati
+  više od pola sata.
+  Usporedite dobivenu performansu 
+  s performansom dubokih modela.
+</ul>
+
+<p>
+Ako je rezultat izvođenja prihvatljiv,
+pohranite kod u datoteku <code>mnist_shootout.py</code>.
+
+<h4 id="z8">8. Normalizacija po podatcima (bonus)</h4>
+
+<p>
+Proučite postupak
+<a href="https://arxiv.org/abs/1502.03167">normalizacije po grupi</a> 
+(engl. batch normalization) 
+za potpuno povezane modele.
+Proširite duboki klasifikator iz zadatka 5 kodom 
+koji normalizira izlaz linearnog dijela svakog skrivenog sloja
+tako da za tekuću grupu ima sredinu nula i jediničnu varijancu.
+Pripazite na to da parametre normalizacije 
+valja mijenjati samo prilikom 
+<a href="https://stackoverflow.com/a/51433411/5265233">učenja</a>.
+Usporedite dobivenu performansu 
+s performansom osnovnih dubokih modela.
+Proučite 
+<a href="https://www.alexirpan.com/2017/04/26/perils-batch-norm.html">probleme</a>
+koji se mogu javiti pri učenju modela
+s normalizacijskim slojevima.
+
+<p>
+Za sve bodove potrebno je razviti vlastitu implementaciju,
+a ne koristiti <code>torch.nn.BatchNorm1d</code>.
+<!-- TODO
+  mini-grupe, adam, normalizacija
+  early stopping
+  anizotropna regularizacija
+-->
+</div>
+
+<footer id="footer">
+
+  <p>
+  Ove stranice sastavljaju Petra Bevandić,
+  Marin Oršić, Ivan Grubišić, Josip Šarić
+  i Siniša Šegvić.
+  </p>
+
+  <p>
+  Prva verzija ovih stranica bila je rezultat istraživačkog projekta 
+  <a href="http://multiclod.zemris.fer.hr">MULTICLOD</a> (I-2433-2014) Hrvatske zaklade za znanost.
+  </p>
+
+  <p>
+  Izrađeno
+  <a href="http://www.vim.org/">
+  vi
+  </a>
+  -jem i
+  <a href="http://www.gedit.org/">
+  gedit
+  </a>
+  om.
+  </p>
+
+
+  <p>
+  Svi komentari su dobrodošli:
+  <span>
+    <img alt="dubuce1 at fer hr" src="email.png" style="height: 0.9rem; display: inline; margin: 0; border: 0;"/>
+  </span>
+
+    <div style="float: left;">Posljednja promjena: 02-Mar-2026 18:35 CET</div>
+    <div style="float: right;"><a href="https://www.zemris.fer.hr/predmeti/du1/">Povratak</a></div>
+  </p>
+  </footer>
+
+</body>
+<script>hljs.highlightAll();</script> 
+</html>
+

@@ -1,0 +1,2260 @@
+<!DOCTYPE html public "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="author" content="Sinisa Segvic, Marin Orsic and Petra Bevandic">
+  <title>Nulta laboratorijska vježba iz Dubokog učenja</title>
+  <link rel="stylesheet" type="text/css" href="./dl.css" >
+  <link rel="stylesheet" href="./highlight/styles/default.min.css">
+  <script type="text/javascript" src="./mathjax/tex-mml-chtml.js"></script>
+  <script src="./highlight/highlight.min.js"></script>
+</head>
+
+<body>
+
+<div id="page">
+
+<h2>Nulta laboratorijska vježba iz Dubokog učenja</h2>
+<h4>
+Podsjetnik na logističku regresiju, gradijentni spust, Python i Numpy</h4>
+
+<p>
+U ovoj vježbi ćemo ponoviti osnove strojnog učenja,
+podsjetiti se na optimizaciju gradijentnim spustom
+te upoznati se s mogućnostima Pythona, Numpyja i Matplotliba.
+Razvit ćemo pythonske implementacije
+binarne i višerazredne logističke regresije
+utemeljene na Numpyjevim primitivima.
+Ispitat ćemo svojstva naše implementacije
+analizom numeričkih pokazatelja uspješnosti klasifikacije
+te iscrtavanjem funkcije odluke primjenom Matplotliba.
+Cilj vježbe je ponoviti osnovna znanja s prethodnih kolegija
+te razviti intuiciju koja će nam biti dragocjena
+pri oblikovanju i debuggiranju dubokih modela strojnog učenja.
+
+<p>
+U okviru vježbe razvit ćemo tri pythonska modula:
+<code>data</code>, <code>binlogreg</code>
+i <code>logreg</code>.
+Modul <code>data</code> će sadržavati operacije
+vezane uz stvaranje i iscrtavanje skupa slučajnih 2D podataka
+te operacije vezane uz evaluaciju klasifikacijske performanse.
+Taj modul ćemo koristiti i u prvoj vježbi
+gdje ćemo na istim podatcima usporediti 
+duboko učenje sa SVM-om kao prvim izborom
+u mnogim klasifikacijskim problemima.
+Preostala dva modula će sadržavati funkcije i testove
+za binarnu i višerazrednu logističku regresiju.
+
+<h4 id="z0a">0a. O parcijalnim derivacijama vektorskih funkcija</h4>
+
+<p>
+Deriviranje vektorskih i skalarnih funkcija više varijabli
+je ključni koncepti za shvaćanje gradijentne optimizacije
+parametara modela strojnog učenja 
+i zato ga moramo dobro poznavati.
+Po definiciji,
+<a href="https://en.wikipedia.org/wiki/Partial_derivative">parcijalna derivacija</a>
+funkcije više varijabli
+jest derivacija s obzirom na jednu od tih varijabli
+pod pretpostavkom da su sve ostale varijable konstantne.
+Parcijalne derivacije vektorskih funkcija 
+možemo računati odvojeno za svaku komponentu funkcije.
+
+<p>
+Ilustrirajmo ove pojmove na primjeru sljedeće 
+vektorske funkcije vektorske varijable:
+
+<p>
+\(
+  \mathbf{f}(\mathbf{x})=
+  \left[
+  \begin{matrix}
+    x_1^2 + x_2   x_3\\
+    x_1   + x_2 + x_3\\
+  \end{matrix}
+  \right]
+\)
+
+<p>
+Parcijalna derivacija prve komponente
+funkcije \(\mathbf{f}\) po drugoj komponenti
+argumenta \(\mathbf{x}\) odgovara izrazu:
+\( \partial f_1/\partial x_2 = x_3 \) .
+Parcijalna derivacija druge komponente
+funkcije  po prvoj komponenti
+argumenta odgovara izrazu:
+\( \partial f_2/\partial x_1 = 1 \) .
+
+<h5> Jakobijeva matrica</h5>
+<p>
+Skup svih parcijalnih derivacija
+vektorske funkcije vektorske varijable
+možemo izraziti
+<a href="https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant">Jakobijevom matricom</a>
+(ili, kraće, Jakobijanom).
+Retci Jakobijana odgovaraju komponentama vektorske funkcije,
+dok stupci odgovaraju komponentama nezavisne varijable.
+Tako npr. Jakobijan skalarne funkcije
+D-dimenzionalne vektorske varijable 
+ima jedan redak i D stupaca,
+dok Jakobijan funkcije sinus
+ima jedan redak i jedan stupac.
+Po istoj logici, Jakobijan funkcije \(\mathbf{f}\)
+imao bi dva retka i tri stupca:
+<p>
+\(
+  \mathbf{f}'(\mathbf{x}) = 
+  \frac{d \mathbf{f}}{d \mathbf{x}} =                                                                      
+    \left[
+    \begin{matrix}
+    \frac{\partial f_1}{\partial x_1} &
+    \frac{\partial f_1}{\partial x_2} &
+    \frac{\partial f_1}{\partial x_3} \\
+    \frac{\partial f_2}{\partial x_1} &
+    \frac{\partial f_2}{\partial x_2} &
+    \frac{\partial f_2}{\partial x_3} 
+    \end{matrix}
+    \right]
+  =
+    \left[
+    \begin{matrix}
+    2x_1 & x_3 & x_2 \\
+    1    &  1 &  1 
+    \end{matrix}
+    \right]
+\)
+
+<p>
+Često će nam biti interesantne
+matrice  parcijalnih derivacija
+obzirom na samo neke od nezavisnih varijabli
+promatrane funkcije.
+Primjerice, ako kažemo da vektor 
+\(\mathbf{q}\) sadrži prve dvije komponente
+vektora \(\mathbf{x}\)
+(tj. da vrijedi \(\mathbf{q}=[x_1 x_2]^\top\)),
+onda možemo pisati:
+
+<p>
+\(
+  \mathbf{f}'(\mathbf{q}) = 
+    \left[
+    \begin{matrix}
+    \frac{\partial f_1}{\partial x_1} &
+    \frac{\partial f_1}{\partial x_2} \\
+    \frac{\partial f_2}{\partial x_1} &
+    \frac{\partial f_2}{\partial x_2}  
+    \end{matrix}
+    \right]
+  =
+    \left[
+    \begin{matrix}
+    2x_1 & x_3  \\
+    1    &  1  
+    \end{matrix}
+    \right]
+\)
+
+<h5>Kompozicije funkcija i pravilo ulančavanja</h5>
+
+<p>
+Pretpostavimo sada da naša funkcija \(\mathbf{f}\)
+nema izravan kontakt s nezavisnom varijablom,
+nego da na nju djeluje posredno,
+preko funkcije \(\mathbf{g}\).
+Rezultantna funkcija
+\(\mathbf{F}\)
+odgovara kompoziciji funkcija 
+\(\mathbf{f}\)
+i 
+\(\mathbf{g}\):
+
+<p>
+\(
+  \mathbf{F}(\mathbf{x})
+    =
+    ( 
+      \mathbf{f}
+      \circ
+      \mathbf{g}
+    )
+    (\mathbf{x})
+    =
+    \mathbf{f}(
+      \mathbf{g}(\mathbf{x})
+    )
+\)
+
+<p>
+Neka je funkcija \(\mathbf{g}\) zadana kako slijedi:
+
+<p>
+\(
+  \mathbf{g}(\mathbf{x})
+    =
+      \left[
+      \begin{matrix}
+        \sin(x_1) \\
+        x_2^3 + x_1 x_2\\
+        x_3
+      \end{matrix}
+      \right]
+\)
+
+<p>
+Pretpostavimo da želimo odrediti derivaciju
+kompozicije funkcija \(\mathbf{F}\).
+U pomoć nam priskače pravilo 
+<a href="https://en.wikipedia.org/wiki/Chain_rule#Higher_dimensions">ulančavanja</a> vektorskih funkcija
+koje u općenitom obliku glasi:
+
+<p>
+\(
+  \mathbf{F}'(\mathbf{x})
+    =
+    \mathbf{f}'(\mathbf{g}(\mathbf{x}))
+    \cdot
+    \mathbf{g}'(\mathbf{x})
+\)
+
+<p>
+Kad pravilo ulančavanja primijenimo
+na naš konkretni primjer,
+Jakobijevu matricu funkcije \(\mathbf{F}\)
+dobivamo sljedećim izvodom:
+
+<p>
+\(
+  \mathbf{F}'(\mathbf{x})
+    =
+    \mathbf{f}'(\mathbf{g}(\mathbf{x}))
+    \cdot
+    \mathbf{g}'(\mathbf{x})
+    =
+    \left[
+    \begin{matrix}
+    2g_1(\mathbf{x}) & g_3(\mathbf{x}) & g_2(\mathbf{x}) \\
+    1    &  1 &  1 
+    \end{matrix}
+    \right]
+    \cdot
+      \left[
+      \begin{matrix}
+        \cos(x_1) & 0          & 0\\
+        x_2       & x_1+3x_2^2 & 0\\
+        0         & 0          & 1
+      \end{matrix}
+      \right]
+\)
+
+<p>
+\(
+  \mathbf{F}'(\mathbf{x})
+    =
+    \left[
+    \begin{matrix}
+    2\sin(x_1) & x_3 & x_2^3 + x_1 x_2 \\
+    1    &  1 &  1
+    \end{matrix}
+    \right]
+    \cdot
+      \left[
+      \begin{matrix}
+        \cos(x_1) & 0          & 0\\
+        x_2       & x_1+3x_2^2 & 0\\
+        0         & 0          & 1
+      \end{matrix}
+      \right]
+\)
+
+<p>
+\(
+  \mathbf{F}'(\mathbf{x})
+    =
+    \left[
+    \begin{matrix}
+    2\sin(x_1)\cos(x_1) + x_2 x_3 &
+    x_1 x_3 + 3 x_2^2 x_3 &
+    x_2^3 + x_1 x_2 \\
+    \cos(x_1) + x_2 &
+    x_1+3x_2^2 &  1
+    \end{matrix}
+    \right]
+\)
+
+<h5>
+<h4 id="z0b">0b. O optimizaciji gradijentnim spustom</h4>
+
+<p>
+U strojnom učenju posebno često analiziramo svojstva
+<em>skalarnih</em> funkcija više varijabli,
+a tipičan primjer je optimiranje funkcije gubitka 
+o kojoj ćemo više pričati u odjeljcima
+<a href="#z0c">0c</a> i <a href="#z0d">0d</a>.
+Ako je funkcija više varijabli skalarna
+(tj. ima samo jednu komponentu),
+tada <em>gradijent</em> te funkcije sadrži
+parcijalne derivacije po svim varijablama.
+Ako gradijent promatramo kao "obični" stupčani vektor
+(konvencije se razlikuju, ali to je najčešće slučaj),
+gradijent će odgovarati transponiranoj Jakobijevoj matrici:
+
+<p>
+\(
+  \nabla f(\mathbf{x})
+  =
+  \frac{d f(\mathbf{x})}{d \mathbf{x}}^\top
+\).
+
+<p>
+Ako funkciju \(f\) aproksimiramo
+Taylorovim razvojem prvog reda,
+dobivamo aproksimaciju:
+
+<p>
+\(
+  f(\mathbf{x} + \Delta \mathbf{x}) \approx 
+    f(\mathbf{x}) +
+    \frac{d f(\mathbf{x})}{d \mathbf{x}}
+    \Delta \mathbf{x}
+    =
+    f(\mathbf{x}) +
+    \nabla f(\mathbf{x})^\top
+    \Delta \mathbf{x}
+\).
+
+<p>
+Pogledajmo što se zbiva kad u tu aproksimaciju
+uvrstimo pomak u smjeru negativnog gradijenta:
+<p>
+ \(\Delta \mathbf{x} = - \epsilon\cdot \mathbf{g}, \;
+  \mathbf{g}=
+    \nabla f(\mathbf{x})
+ \).
+
+<p>
+Ako Taylorova aproksimacija vrijedi,
+vrijednost funkcije \(f\) bi trebala opadati:
+
+<p>
+\(
+  f(\mathbf{x} - \epsilon\cdot\mathbf{g}) \approx 
+    f(\mathbf{x}) - \epsilon\cdot
+      \mathbf{g}^\top \mathbf{g}
+    < f(\mathbf{x})\;.
+\)
+
+<p>
+Vidimo da iterativno pomicanje u smjeru negativnog gradijenta
+može dovesti do lokalnog minimuma funkcije \(f\).
+To je najjednostavnija metoda gradijentne optimizacije,
+a poznata je pod nazivom <em>gradijentni spust</em>.
+U praksi, aproksimacija će biti tim točnija
+što je hiper-parametar \(\epsilon\) manji.
+Međutim, nije dobro da \(\epsilon\) bude premali 
+kako učenje ne bi previše trajalo.
+Zbog toga su smišljene brojne poboljšane metode,
+a neke od njih ćemo upoznati na predavanjima.
+
+<h4 id="z0c">0c. Osnove strojnog učenja</h4>
+
+<p>
+Strojno učenje proučava izradu programskih komponenata
+koje elemente svoje funkcionalnosti mogu naučiti na podatcima.
+Pretpostavimo da na ulazu našeg potprograma dobivamo
+D-dimenzionalni <em>podatak</em> \(\mathbf{x}\)
+koji može biti točka ravnine (D=2),
+siva slika dimenzija 28x28 (D=784) ili nešto treće.
+Pretpostavimo dalje da naš potprogram ulazni podatak treba
+<em>svrstati</em> u jedan od C razreda (ili klasa).
+Drugim riječima, naš potprogram na izlazu treba proizvesti
+<em>predikciju</em> \(y\) koja odgovara
+indeksu razreda ulaznog podatka (vrijedi \(1\le y\le C\)).
+U slučaju da je naš potprogram element sustava
+za raspoznavanje brojeva na skeniranim uplatnicama,
+razredi bi bili znamenke od 0 do 9.
+Razredi podataka na sljedećoj slici
+bili bi: 3, 1, 3, 4, 7, 2, itd:
+<a href="https://www.zemris.fer.hr/~ssegvic/project/pubs/vukotic14ms.pdf"><img src="figures/vukotic14ms1.png"
+ width="100%" alt="MNIST dataset"></a>
+
+<p>
+Kad bi naš zadatak bio raspoznati prometnu signalizaciju
+u sustavu za sigurnosnu inspekciju prometnica,
+razredi bi bili standardne oznake prometnih znakova
+(npr. A03, A04, A05, A33, B31 itd.)
+kao što to ilustrira sljedeća slika:
+<a href="https://www.zemris.fer.hr/~ssegvic/project/pubs/vukotic14ms.pdf"><img src="figures/vukotic14ms2.png"
+ width="100%" alt="MASTIF dataset"></a>
+
+<p>
+Postavlja se pitanje kako organizirati računalni program
+koji treba podržati učenje na primjerima označenih podataka.
+Principijelan prvi korak u tom smjeru jest
+izraziti dio programa koji treba učiti
+u obliku matematičke funkcije sa slobodnim <em>parametrima</em>.
+Tu funkciju nazivat ćemo <em>modelom</em>.
+Možda najjednostavniji model za naš konkretni primjer je:
+
+<p>
+\(y = argmax(\mathbf{W}\cdot\mathbf{x}+\mathbf{b})\).
+
+<p>
+Slobodni parametri tog modela su
+\(\mathbf{W}\) i \(\mathbf{b}\).
+Pri tome \(\mathbf{W}\) predstavlja matricu
+\(\mathrm{C}\times \mathrm{D}\), 
+\(\mathbf{b}\) je vektor \(\mathrm{C}\times \mathrm{1}\),  
+dok \(\cdot\) označava matrično množenje.
+Intuitivno, takav model ulazni podatak \(\mathbf{x}\)
+uspoređuje sa svakim od C redaka matrice \(\mathbf{W}\)
+(skalarni produkt se pod nekim uvjetima može promatrati kao usporedba),
+te podatak svrstavamo u razred definiran indeksom retka
+koji je "najsličniji" podatku.
+U praksi ćemo koristiti diferencijalne varijante tog modela
+koje će omogućiti učenje gradijentnim spustom
+o kojem smo pričali u odjeljku <a href="#z0b">0b</a>.
+
+<p>
+Da bismo model naučili, trebaju nam još dva koncepta:
+<em>gubitak</em> i <em>optimizacijski postupak</em>.
+Gubitak je funkcija koja kaže koliko se dobro
+predikcije modela poklapaju sa podatcima za učenje. 
+Optimizacijski postupak "štima" parametre
+tako da gubitak na skupu za učenje bude što manji.
+
+<p>
+Formalno, algoritam strojnog učenja definiran je
+modelom, gubitkom i optimizacijskim postupkom.
+Npr. kod logističke regresije
+koju ćemo detaljno upoznati u sljedećem odjeljku (<a href="#z0b">0d</a>) imamo:
+<ul><li>
+  model: \(\mathrm{softmax}(\mathbf{W}\cdot\mathbf{x}+\mathbf{b})\),
+<li>
+  gubitak: negativna log-izglednost i
+<li>
+  optimizacijski postupak: gradijentni spust.
+</ul>
+Izlaz logističke regresije je C-dimenzionalni vektor
+koji predstavlja vjerojatnosti \(P(Y=c_i|x)\)
+koje su pridružene događajima da podatak \(\mathbf{x}\)
+pripada razredu \(c_i\).
+Modele s takvim izlazom svrstavamo u
+diskriminativne probabilističke modele.
+
+<h4 id="z0d">0d. Uvod u višerazrednu logističku regresiju</h4>
+
+<p>
+Višerazredna logistička regresija [1] podrazumijeva
+probabilistički diskriminativni klasifikacijski model
+pripadnosti vektorskog podatka \(\mathbf{x}\)
+razredima \(c_j, j=0, 1, ..., C-1\).
+Radi se o generaliziranom linearnom modelu koji
+afinu transformaciju podataka spljošćuje (engl. squash)
+na vjerojatnosni interval [0,1].
+Ishod klasifikacije formalno prikazujemo
+slučajnom varijablom \(Y\) za koju vrijedi
+\(\sum_j P(Y=c_j|\mathbf{x}) = 1 \; \forall \mathbf{x}\).
+
+<p>
+U binarnom slučaju podatak može pripadati
+jednom od samo dvaju razreda (\(C=2\)).
+Parametri modela tada su vektor \(\mathbf{w}\) te pomak \(b\),
+a rezultat modela su aposteriorne vjerojatnosti
+razreda \(c_0\) i \(c_1\):
+
+<p>
+\(
+P(Y=c_1|\mathbf{x}) = σ(\mathbf{w}^\top\mathbf{x} + b),
+   \mathrm{\ gdje\ je\ } σ(s)=e^s/(1+e^s) \\
+P(Y=c_0|\mathbf{x}) = 1 - P(c_1|\mathbf{x})
+\)
+
+<p>
+Pri tome podatci \(\mathbf{x}\) imaju dimenzije Dx1,
+parametar \(\mathbf{w}\) ima dimenzije Dx1,
+dok je parametar \(b\) skalar.
+
+<p>
+Kad podatke klasificiramo u C razreda,
+model možemo sažeto formulirati 
+sljedećim skupom jednadžbi
+(funkciju softmax ćemo objasniti u nastavku):
+
+<p>
+\(
+P(Y=c_j|\mathbf{x}) = \mathrm{softmax}(j,
+    \mathbf{W} · \mathbf{x} + \mathbf{b}),
+    j = 0, 1, ..., C-1.<br>
+\)
+
+<p>
+Matrice \(\mathbf{W}\) i \(\mathbf{b}\)
+sadrže parametre postupka,
+a njihove dimenzije su CxD odnosno Cx1.
+Pri tome D predstavlja dimenzionalnost podataka,
+dok je C broj razreda.
+Vektor \(\mathbf{s}=\mathbf{W}·\mathbf{x}+\mathbf{b}\)
+ima dimenzije Cx1 te sadrži tzv.
+klasifikacijske mjere razreda
+(možemo koristiti i prijevod klasifikacijski rezultat,
+ engl. classification scores).
+Klasifikacijske mjere pokazuju
+koliko je odgovarajući razred vjerojatniji
+(odnosno manje vjerojatan) u odnosu na druge razrede.
+Konačno, aposteriorne vjerojatnosti razreda
+dobivamo funkcijom softmax
+čija j-ta komponenta odgovara izrazu:
+\(
+\mathrm{softmax}(j, \mathbf{s}) = e^{s_j}/\sum_k e^{s_k} .
+\)
+
+<p>
+Ako detaljnije razmotrimo definiciju funkcije softmax,
+primijetit ćemo da su klasifikacijske mjere redundantne:
+kad svakoj od njih dodamo istu konstantu
+funkcija softmax na izlazu daje istu razdiobu.
+Iz toga slijedi da jednu od C klasifikacijskih mjera
+bez smanjenja općenitosti možemo fiksirati
+postavljanjem odgovarajućeg retka parametara na nulu
+(\(\mathbf{W}_{j,:}=b_{j}=0\) ).
+Tako normalizirane klasifikacijske mjere
+mogu se interpretirati kao logaritmi omjera 
+<a href="https://en.wikipedia.org/wiki/Multinomial_logistic_regression#As_a_set_of_independent_binary_regressions">šansi</a>
+promatranog razreda u odnosu na fiksirani razred.
+U praksi se pokazuje da postupak jednako dobro konvergira
+i ako optimiramo sve retke \(\mathbf{W}\) i \(\mathbf{b}\).
+Stoga u implementaciji često optimiramo sve parametre
+jer se tako dobiva nešto jednostavniji programski kod.
+Međutim, redundantnost ulaza softmaksa u pravilu koristimo
+kako bismo izbjegli da eksponenciranje velikih klasifikacijskih mjera
+rezultira numeričkim preljevom.
+Primjer takve implementacije donosimo u nastavku:
+
+<pre><code class="python">  # stabilni softmax
+  def stable_softmax(x):
+    exp_x_shifted = np.exp(x - np.max(x))
+    probs = exp_x_shifted / np.sum(exp_x_shifted)
+    return probs
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Obratite pažnju da prikazani primjer
+funkcionira samo ako mu se kao ulazni argument
+pošalje tenzor prvog reda (vektor).
+U vježbi ćete takvu proceduru
+trebati primijeniti na matricu
+\(N\times C\)
+u kojoj će svaki redak sadržavati
+klasifikacijske mjere odgovarajućeg podatka.
+Pokušajte to ostvariti bez eksplicitne petlje.
+
+<p>
+Parametre logističke regresije
+\(\mathbf{W}\)
+i
+\(\mathbf{b}\)
+određujemo optimiranjem funkcije gubitka
+\(\mathcal{L}(\mathbf{W},\mathbf{b})\)
+na skupu za učenje
+\(\mathcal{D}\).
+Skup za učenje tipično se sastoji od
+parova podataka i odgovarajućih oznaka razreda
+\(\mathcal{D}=
+  \{(\mathbf{x_i},y_i), i = 1, 2, ..., N\}\).
+Ovo je najjednostavnije pojmiti na problemu
+klasifikacije 2D podataka u C različitih razreda.
+U tom slučaju \(\mathbf{x_i}\) su elementi ravnine,
+dok su \(y_i\) elementi cjelobrojnog intervala
+između 0 i C-1.
+Gubitak logističke regresije odgovara
+prosječnoj negativnoj log-izglednosti
+(eng. negative log-likelihood, NLL)
+preko svih podataka:
+<p>
+\(
+\mathcal{L}_\mathrm{NLL}
+  (\mathbf{W},\mathbf{b}|\mathcal{D})
+  =
+  - \frac{1}{N}
+  \sum_i \log P(Y=y_i|\mathbf{x}_i)\;.
+\)
+
+<p>
+Obratite pažnju na to da \(P(Y=y_i|\mathbf{x}_i)\)
+označava vjerojatnost kojom model podatak
+\(\mathbf{x}_i\)
+klasificira u točan razred \(y_i\).
+Ovako izražen gubitak favorizira parametre
+\(\mathbf{W}\) i
+\(\mathbf{b}\)
+koji točnim oznakama podataka za učenje
+pridružuju što veće vjerojatnosti.
+U praksi ništa nas ne sprječava da umjesto 
+negativne log-izglednosti parametara optimiramo neki
+<a href="https://arxiv.org/abs/1708.02002">drugi gubitak</a>.
+Međutim, negativna log-izglednost vrlo dobro funkcionira u praksi
+te je zbog toga često metoda izbora 
+kod učenja na čvrstim oznakama.
+
+<p>
+Nažalost, postoje i podatci
+koji nisu pogodni
+za označavanje čvrstim oznakama
+odnosno jednojediničnim kodovima.
+Kao primjer možemo zamisliti sliku
+smeđe životinje sa šiljatim ušima
+u visokoj travi.
+Ako označivač nije siguran
+radi li se o mački, lisici ili psu,
+oznaku je najprikladnije izraziti
+<i>distribucijom</i> tako da
+modovi odgovaraju vjerojatnim razredima.
+Prethodno uveden gubitak negativne log izglednosti
+u ovom slučaju neće biti primjenljiv
+jer sada umjesto indeksa točnog razreda
+\(y_i\)
+imamo mekane oznake koje predstavljaju
+kategoričke distribucije preko C razreda:
+\(Y_i=[y_{ij}]_{j=1}^C\).
+Gubitak sada možemo izraziti
+otežanim prosjekom negativne log-izglednosti
+preko mehih oznaka
+\(Y_i\):
+<p>
+\(
+\mathcal{L}_\mathrm{CE}
+  (\mathbf{W},\mathbf{b}|\mathcal{D})
+  =
+  - \frac{1}{N}
+  \sum_i
+   \sum_j
+    y_{ij} \cdot 
+    \log P(Y=y_{ij}|\mathbf{x}_i)\;.
+\)
+
+<p>
+Pokazuje se da ovaj izraz odgovara prosječnoj
+<a href="https://en.wikipedia.org/wiki/Cross_entropy">unakrsnoj entropiji</a>
+(eng. cross entropy, CE)
+između točne i prediktirane distribucije po svim podatcima
+(provjerite to za vježbu!).
+
+<p>
+Primijetite da naše jednadžbe
+izražavaju prosječni gubitak 
+preko svih viđenih podataka.
+Takva formulacija gubitka 
+olakšava praćenje napredovanja učenja
+i dijagnosticiranje problema 
+zbog izravne veze s prosječnom
+točnosti predikcija.
+Početni klasifikacijski gubitak
+na skupu s 10 razreda (CIFAR-10, MNIST)
+tipično će biti 2.3 (razmislite zašto!)
+Dodatno, apsolutni iznos gradijenata 
+ne ovisi o broju podataka
+(odnosno o veličini mini-grupe),
+a to značajno olakšava ugađanje hiper-parametara postupka.
+Zbog toga ćemo u praksi uvijek koristiti
+usrednjeni ukupni gubitak
+umjesto akumuliranog ukupnog gubitka.
+
+<p>
+Nažalost, optimiranje parametara logističke regresije
+ne možemo provesti u zatvorenom obliku,
+nego moramo posegnuti za nekim iterativnim postupkom.
+Na sreću, funkcija gubitka \(\mathcal{L}_\mathrm{CE}\)
+je konveksna [2].
+To znači da gradijentne metode poput gradijentnog spusta
+sigurno neće zapeti u nekom lokalnom optimumu
+(iako mogu podbaciti zbog drugih razloga).
+
+<p>
+Funkciju gubitka
+\(\mathcal{L}_\mathrm{CE}\)
+možemo optimirati 
+raznim gradijentnim postupcima.
+Takvi postupci u svakoj iteraciji učenja
+pomiču parametre u smjeru
+negativnog gradijenta gubitka.
+Period tijekom kojeg algoritam dobije na uvid
+sve podatke za učenje nazivamo epohom.
+Ovisno o težini problema, za konvergenciju su potrebne
+desetine, stotine, ili tisuće epoha.
+
+<p>
+Glavni izazov kod gradijentnih pristupa optimizacije
+predstavlja određivanje gradijenta gubitka
+po svim parametrima postupka.
+S obzirom na to da gubitak i-tog podatka
+u logističkoj regresiji možemo promatrati
+kao kompoziciju logaritmiranog softmaksa 
+i afine transformacije podataka,
+gradijente određujemo primjenom pravila
+<a href="https://en.wikipedia.org/wiki/Chain_rule#Higher_dimensions">ulančavanja</a>.
+
+<p>
+Literatura:
+<ol>
+<li>
+Jan Šnajder, Bojana Dalbelo Bašić: Strojno učenje. FER, Zagreb.
+<li>
+http://qwone.com/~jason/writing/convexLR.pdf
+</ol>
+
+
+<h4 id="z0e">0e. Gradijenti binarne logističke regresije</h4>
+
+<p>
+Ovdje ćemo skicirati optimirani postupak računanja
+parcijalnih derivacija funkcije gubitka
+binarne logističke regresije.
+Za početak, dogovorimo notaciju.
+Označimo gubitak i-tog podatka s
+\(
+  \mathcal{L}_i(\mathbf{w},\mathbf{b}|\mathcal{x}_i,y_i)=
+  -\log P(Y=y_i|\mathbf{x}_i)
+\).
+Definirajmo parcijalnu derivaciju
+\(∂\mathcal{L}_i/∂\mathbf{w}\) 
+i predstavimo je retčanim vektorom 
+u kojem se nalaze gradijenti gubitka
+\(\mathcal{L}_i\)
+po elementima parametra \(\mathbf{w}\).
+Slično, neka parcijalna derivacija
+\(∂\mathcal{L}_i/∂b\)
+bude retčani vektor gradijenata gubitka
+\(\mathcal{L}_i\) 
+po parametru \(b\).
+
+<p>
+Kako bismo omogućili kompaktniji zapis
+aposteriorne vjerojatnost i-tog razreda,
+možemo uvesti <em>proširenu</em> sigmoidalnu funkciju
+koja uzima u obzir točan razred podatka
+čiju klasifikacijsku mjeru
+transformiramo u vjerojatnost:
+<p>
+\(
+  \sigma_P(y,s)=
+  \begin{cases}
+    \sigma(s),& y=c_1\\
+    1-\sigma(s),& y=c_0
+  \end{cases}
+  =
+  \begin{cases}
+    \frac{e^{s}}{1+e^{s}},& y=c_1\\
+    \frac{1}{1+e^{s}},& y=c_0
+  \end{cases}
+\)
+
+<p>
+Sada gubitak
+\(\mathcal{L}_i\)
+odgovara kompoziciji
+logaritmirane proširene sigmoide
+i afine redukcije i-tog podatka
+(podsjetimo se, \(s_i\) označava
+ skalarnu klasifikacijsku mjeru
+ podatka \(\mathbf{x}_i\)):
+
+<p>
+\(
+\mathcal{L}_i(\mathbf{w},\mathbf{b}| \mathbf{x}_i) =
+  - \log \sigma_P(y_i,s_i)\\
+s_i = \mathbf{w}^\top\mathbf{x}_i+ b
+\)
+
+<p>
+Gradijente parametara stoga možemo izraziti
+prema pravilu ulančavanja kao
+<a href="https://en.wikipedia.org/wiki/Chain_rule#Higher_dimensions">umnožak</a> matrica parcijalnih derivacija
+(tzv.
+<a href="https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant">Jacobijevih</a> matrica)
+funkcija 
+\(\mathcal{L}_i\)
+i \(s_i\):
+
+<p>
+\(
+∂\mathcal{L}_i/∂\mathbf{w} =
+  ∂\mathcal{L}_i/∂s_i · ∂s_i/∂\mathbf{w}  \\
+∂\mathcal{L}_i/∂b = ∂\mathcal{L}_i/∂s_i · ∂s_i/∂b
+\)
+
+<p>
+Parcijalna derivacija gubitka
+\(\mathcal{L}\)
+po linearnom klasifikacijskom rezultatu \(s\)
+u podatku \(\mathbf{x}_i\) jest skalar 
+\(∂\mathcal{L}_i/∂s_i\)
+kojeg promatramo kao Jakobijan dimenzija 1x1.
+Parcijalne derivacije klasifikacijske mjere
+podatka \(\mathbf{x}_i\)
+po elementima parametara \(\mathbf{w}\) odnosno \(b\),
+su matrica \(∂s_i/∂\mathbf{w}\) dimenzija 1xD
+odnosno skalar \(∂s_i/∂b\) kojeg promatramo kao matricu 1x1.
+Izrazimo prvo derivaciju gubitka
+po klasifikacijskoj mjeri
+tako da ovisnost o točnom razredu i-tog podatka izrazimo
+<a href="https://en.wikipedia.org/wiki/Iverson_bracket">Iversonovim</a> uglatim zagradama.
+Ako se dogovorimo da vrijednost izraza \([\![q]\!]\) 
+iznosi 1 ako je \(q\) istinit a nula inače,
+traženu parcijalnu derivaciju možemo predstaviti 
+sljedećim izrazom (provjerite to za vježbu!):
+
+<p>
+\(
+∂\mathcal{L}_i/∂s_i = P(c_1|\mathbf{x}_i) - [\![y_i=c_1]\!] .
+\)
+
+<p>
+Parcijalna derivacija klasifikacijske mjere
+po parametrima \(\mathbf{w}\) i \(b\)
+za podatak \(\mathbf{x}_i\) sada je:
+
+<p>
+\(
+∂s_i/∂\mathbf{w} = \mathbf{x}_i^\top \\
+∂s_i/∂b = 1 .
+\)
+
+<p>
+Kad
+uvedemo pokratu
+\(\mathbf{g}_s=[∂\mathcal{L}_i/∂s_i]_{i=1}^N\)
+te
+uzmemo u obzir da ukupni gubitak zbraja doprinose
+po svim podatcima,
+dobivamo konačne izraze:
+
+<p>
+\(
+  ∂\mathcal{L}/∂\mathbf{w} 
+   = 1/N · \sum_i ∂\mathcal{L}_i/∂\mathbf{w}
+   = 1/N · \sum_i
+      g_{si} ·
+      \mathbf{x}_i^\top  \;,\\
+  ∂\mathcal{L}/∂b = 1/N · \sum_i ∂\mathcal{L}_i/∂b
+   = 1/N · \sum_i g_{si} \;.
+\)
+
+<!--
+<p>
+\(
+  ∂\mathcal{L}/∂\mathbf{w} 
+   = 1/N · \sum_i ∂\mathcal{L}_i/∂\mathbf{w}
+   = 1/N · \sum_i
+     (P(c_1|\mathbf{x}_i) - [\![y_i=c_1]\!]) ·
+      \mathbf{x}_i^\top  \\
+  ∂\mathcal{L}/∂b = 1/N · \sum_i ∂\mathcal{L}_i/∂b
+   = 1/N · \sum_i
+     (P(c_1|\mathbf{x}_i) - [\![y_i=c_1]\!]) .
+\)
+-->
+
+<p>
+Najbolja računska performansa danas se postiže
+izražavanjem petlji optimiranim operacijama
+nad matricama i vektorima.
+Zbog toga je jasno da ćemo u implementaciji
+računanje gradijenta pomaka izraziti
+pozivom odgovarajuće funkcije numeričke biblioteke.
+Manje je međutim jasno kako izbjeći
+pisanje petlje za računanje gradijenata težina,
+pa ćemo tom važnom detalju pokloniti više pažnje.
+
+<p>
+Naime, pažljivim promatranjem možemo uočiti
+da računanje parcijalne derivacije
+\(∂\mathcal{L}/∂\mathbf{w}\)
+možemo vektorizirati tako da zbroj po podatcima
+predstavimo matričnim umnoškom.
+Vektore podataka ćemo organizirati u matricu
+\(\mathbf{X}\) dimenzija NxD.
+Retci matrice \(\mathbf{X}\) odgovaraju
+podatcima \(\mathbf{x}_i\).
+Parcijalne derivacije
+gubitaka po klasifikacijskoj mjeri
+smjestit ćemo u stupčani vektor
+\(\mathbf{g}_s\) dimenzije N.
+Kao što smo naveli ranije, vrijedi:
+\(\mathbf{g}_s = [∂\mathcal{L}_i/∂s_i]_{i=1}^N\).
+Lako se vidi da gradijent gubitka 
+po k-toj težini odgovara skalarnom produktu
+vektora \(\mathbf{g}_s\) i k-tog stupca
+matrice \(\mathbf{X}\):
+
+<p>
+\(
+∂\mathcal{L}/∂w_k  
+   = 1/N · \sum_i
+      g_{si} ·
+      x_{ik}  
+   = 1/N ·
+     \mathbf{g}_s^\top
+     \mathbf{X}_{:k} .
+\)
+
+<p>
+Sada je jasno da parcijalne derivacije
+ukupnog gubitka po svim težinama
+možemo dobiti produktom
+vektora \(\mathbf{g_s}^\top\)
+i podatkovne matrice \(\mathbf{X}\):
+
+<p>
+\(
+∂\mathcal{L}/∂\mathbf{w} 
+ = 1/N · \mathbf{g_s}^\top \cdot \mathbf{X} \;.
+\)
+
+<p>
+Taj umnožak prikazan je na sljedećoj slici.
+Na slici se vidi da retci podatkovne matrice
+sadrže pojedinačne podatke te odgovaraju
+parcijalnoj derivaciji klasifikacijske mjere
+po vektoru težina za taj podatak.
+Stupci podatkovne matrice odgovaraju
+parcijalnim derivacijama po
+pojedinačnim komponentama vektora težina.
+Parcijalnu derivaciju ukupnog gubitka po k-toj težini
+dobivamo skalarnim produktom
+vektora \(\mathbf{g_s}\)
+i k-tog stupca matrice \(\mathbf{X}\).
+
+
+<p>
+<!--
+ $\frac{\partial s_i}{\partial w_k}]_{i=1}^N$
+-->
+<img src="figures/binlogreg_matrix2.png"
+ width="100%" alt="binlogreg_matrix"> 
+
+<p>
+Napominjemo da postoji dobar razlog
+da matrica podataka ima strukturu NxD.
+U tom su slučaju komponente pojedinog podatka
+pohranjene na uzastopnim memorijskim lokacijama
+pa miješanje podataka i operacije nad grupama (engl. batch)
+uzrokuju manje promašaja priručne memorije.
+U programskoj implementaciji htjet ćemo dobiti
+gradijente <code>grad_w</code> koji po dimenzijama
+odgovaraju originalnim parametrima
+pa ćemo gornji izraz naprosto transponirati.
+U tom slučaju, poboljšane vrijednosti parametara
+dobivamo oduzimanjem gradijenata <code>grad_w</code>
+moduliranih hiper-parametrom <code>param_delta</code>.
+
+
+<h4 id="z0f">0f. Gradijenti višerazredne logističke regresije</h4>
+
+<p>
+Jednadžbe gradijenata parametara
+višerazredne logističke regresije
+vrlo su slične odgovarajućim gradijentima
+binarne logističke regresije.
+To nas ne treba čuditi jer se lako uviđa
+da je softmax poopćenje sigmoidalne funkcije.
+Međutim, izražavanje tih gradijenata otežava 
+struktura parametra \(\mathbf{W}\).
+Da izbjegnemo poteškoće,
+odvojeno ćemo promatrati gradijente
+svakog od C redaka matrice \(\mathbf{W}\),
+te usporedno s njima gradijente
+svakog od C elemenata vektora \(\mathbf{b}\).
+Označimo te retke odnosno elemente
+s \(\mathbf{W}_{j:}\) i \(b_j\),
+a njihove parcijalne derivacije s
+\(∂\mathcal{L}/∂\mathbf{W}_{j:}\) 
+(matrica dimenzija 1xD) i
+\(∂\mathcal{L}/∂b_j\)
+(matrica dimenzija 1x1).
+<!--
+Kao i ranije, ukupan broj gradijenata
+odgovara ukupnom broju parametara postupka.
+-->
+Kao i ranije, gradijente je najlakše prikazati
+tako da ovisnost o točnom razredu i-tog podatka
+prikažemo Iversonovim uglatim zagradama.
+Prvo ćemo izraziti gradijent
+funkcije gubitka za i-ti podatak
+\(\mathcal{L}_i\)
+po j-toj klasifikacijskoj mjeri
+(izvedite ovaj izraz za vježbu!):
+
+\(
+∂\mathcal{L}_i/∂s_{ij} =
+  P(Y=c_j|\mathbf{x}_i) - [\![y_i=c_j]\!].
+\)
+
+<p>
+U izvedbi je ove parcijalne derivacije
+najpraktičnije sakupiti u matricu
+\(
+  \mathbf{G}_\mathbf{s}=
+  [[∂\mathcal{L}_i/∂s_{ij}]_{j=1}^C]_{i=1}^N
+\)
+dimenzija \(N\times C\).
+Kako bismo tu matricu efikasno izračunali,
+uvodimo matricu aposteriornih vjerojatnosti podataka
+\(\mathbf{P}_{ij} = P(c_j|\mathbf{x_i})\)
+te matricu vektorski kodiranih oznaka \(\mathbf{Y}\):
+<p>
+\(\mathbf{Y}_{ij}=
+  \begin{cases}
+    1,& y_i=c_j\\
+    0,& y_i \neq c_j \; .
+  \end{cases}
+\)
+<p>
+Sada matricu parcijalnih derivacija gubitka
+po klasifikacijskim mjerama
+dobivamo jednostavnim matričnim izrazom
+\(
+\mathbf{G}_\mathbf{s} = \mathbf{P} - \mathbf{Y} \; .
+\)
+
+<p>
+Parcijalne derivacije klasifikacijskih mjera
+po parametrima iste su kao i kod
+binarne logističke regresije:
+
+<p> 
+\(
+  ∂s_{ij}/∂\mathbf{W}_{j:} = \mathbf{x_i}^\top \\
+  ∂s_{ij}/∂b_j = 1 .
+\)
+
+<p>
+Kad ulančimo gradijente komponenata gubitka
+te uzmemo u obzir da ukupni gubitak
+zbraja doprinose po svim podatcima,
+dobivamo izraz kojeg možemo koristiti
+u optimizacijskom postupku:
+
+<p>
+\(
+  ∂\mathcal{L}/∂\mathbf{W}_{j:} 
+   = 1/N · \sum_i ∂\mathcal{L}_i/∂\mathbf{W}_{j:}
+   = 1/N · \sum_i
+       ∂\mathcal{L}_i/∂s_{ij} ·
+       ∂s_{ij}/∂\mathbf{W}_{j:}\\
+  ∂\mathcal{L}/∂\mathbf{W}_{j:} 
+   = 1/N · \sum_i
+        G_{sij}
+      · \mathbf{x}_i^\top \\
+  ∂\mathcal{L}/∂b_j
+   = 1/N · \sum_i ∂\mathcal{L}_i/∂b_j
+   = 1/N · \sum_i G_{sij} .
+\)
+
+<p>
+Pažljivim promatranjem ovog izraza uočit ćemo
+ogromnu sličnost s odgovarajućim izrazom
+gradijenata parametara binarne logističke regresije.
+To nas ne treba čuditi,
+jer retci matrice težina \(\mathbf{W}\)
+u višerazrednom gubitku sudjeluju
+na potpuno isti način kao i težine \(\mathbf{w}\)
+u gubitku binarne logističke regresije.
+Komponente gradijenta
+\( ∂\mathcal{L}/∂\mathbf{W}_{j:} \)
+odgovaraju skalarnom produktu
+j-tog stupca matrice \(\mathbf{G}_s\)
+sa stupcima podatkovne matrice \(\mathbf{X}\).
+Stoga bismo, kao i kod binarne logističke regresije,
+sve gradijente j-tog retka matrice težina
+mogli izračunati umnoškom
+vektora \(\mathbf{G}_{\mathbf{s}:j}\)
+i matrice \(\mathbf{X}\):
+
+<p>
+\(
+∂\mathcal{L}/∂\mathbf{W}_{j:} =
+  1/N
+  \cdot
+  \mathbf{G}^\top_{\mathbf{s}:j}
+  \cdot
+  \mathbf{X} \;.
+\)
+
+
+<p>
+Međutim, pokazuje se da u praksi
+možemo i bolje od toga.
+Važno svojstvo našeg problema jest da su
+parcijalne derivacije klasifikacijskih mjera
+po odgovarajućim redcima matrice težina
+međusobno jednake:
+\(
+  ∂s_{ij}/∂\mathbf{W}_{j:} = \mathbf{x_i}^\top
+  \forall j .
+\)
+Odatle slijedi da gradijente
+svih redaka matrice težina
+vrlo praktično možemo izračunati
+samo jednim matričnim umnoškom:
+<p>
+\(
+  [∂\mathcal{L}/∂\mathbf{W}_{j:}]_{j=1}^C =
+    1/N
+    \cdot
+    \mathbf{G}^\top_\mathbf{s} \cdot \mathbf{X}
+\)
+
+<p>
+Prikazani izraz relativno je lako zapamtiti,
+ali iznimno teško objasniti reverse engineeringom.
+Često se može čuti objašnjenje
+kako do tog izraza dolazimo 
+izravnom primjenom pravila ulančavanja.
+Međutim, takvo objašnjenje je netočno
+jer pravilom ulančavanja ne možemo
+računati parcijalne derivacije po matričnoj varijabli.
+Ako ustrajemo na takvom pristupu,
+morat ćemo ili izravnati matricu u vektor
+ili prihvatiti da Jakobijan u tom slučaju
+postaje tenzor trećeg reda.
+U oba slučaja složenost našeg algoritma bi se povećala
+jer ne bismo mogli iskoristiti 
+inherentnu algebarsku strukturu problema,
+koju možemo jednostavno izraziti ovako:
+\(∂s_{ij}/∂\mathbf{W}_{k:} = 0, j\neq k\).
+Stoga, izraz \(\mathbf{G}^\top_\mathbf{s}\cdot\mathbf{X}\)
+treba promatrati kao <em>kompliciranu optimizaciju</em>,
+a ne kao početnu točku za razumijevanje načina
+za određivanje gradijenata matrice težina
+višerazredne logističke regresije.
+Molimo studente koji prakticiraju nelinearno učenje
+da ovu netrivijalnu ali vrlo važnu činjenicu
+prihvate i zapamte što je moguće prije.
+
+<p>
+Optimirani izraz za računanje gradijenata
+višerazredne logističke regresije
+prikazan je na sljedećoj slici.
+Na slici vidimo da doprinos svakog podatka
+gradijentima težina odgovara vanjskom umnošku
+stupca matrice \(\mathbf{G}^\top_\mathbf{s}\)
+(odnosno, retka matrice \(\mathbf{G_s}\))
+i odgovarajućeg retka podatkovne matrice.
+Kad bismo imali jedan podatak (indeks i)
+i kad bismo računali gradijente
+samo jednog retka matrice težina (indeks j),
+matrica \(\mathbf{G_s}\) svela bi se
+na element \(\mathbf{G}_{\mathbf{s}ij}\),
+a matrica \(\mathbf{X}\) na redak \(\mathbf{x}_i\).
+
+<!--
+$\frac{\partial s_{ij}}
+   {\partial \mathbf{W}_{j:}}=\mathbf{x}_i^\top, 
+   \forall j$
+$[\frac{\partial \mathcal{L}_i}{\partial s_{ij}}]_{j=1}^C$
+$\frac{\partial s_{ij}}{\partial \mathbf{W}_{jk}}$
+$[\frac{\partial \mathcal{L}}{\partial \mathbf{W}_{j:}}]_{j=1}^C$
+-->
+<img src="figures/logreg_matrix3.png"
+ width="100%" alt="logreg_matrix"> 
+
+<p>
+U praksi, gradijente težina 
+\(
+[\frac{\partial\mathcal{L}}
+      {\partial\mathbf{W}_{j:}}]_{j=1}^C
+\)
+računat ćemo jednim pozivom
+funkcije matrične biblioteke,
+npr. 
+<code>grad_W = 1/N * np.dot(GsT, X)</code>.
+Na taj način jednim pozivom
+rješavamo sljedeća dva zadatka:
+<ul>
+<li>
+  istovremeno računanje gradijenata svih redaka matrice \(\mathbf{W}\)
+<li>
+  akumuliranje doprinosa svih podataka \(\mathbf{x}_i\); 
+</ul>
+
+<p>
+Vrlo sličan postupak imat ćemo i za 
+gradijent pomaka \(\mathbf{b}\),
+samo što ćemo umjesto matričnog množenja 
+pozivati funkciju za istovremeno zbrajanje
+svih stupaca matrice, npr.
+<code>np.sum(GsT, axis=1)</code>.
+
+<p>
+Ovakve manevre vrlo rado ćemo koristiti u praksi
+kako programske petlje ne bi bile
+u programskom jeziku visoke razine
+nego u optimiranom bibliotečnom kodu
+koji može biti i do 100 puta brži
+od naivnog koda u C-u.
+Naime, ako je numpy preveden s
+<a href="http://www.openblas.net/">OpenBLAS-om</a>,
+izvedba matričnog množenja će koristiti
+optimirani kod koji jako pazi na promašaje cachea
+i temelji se na ručno optimiranom
+<a href="https://github.com/xianyi/OpenBLAS/blob/develop/kernel/x86_64/sgemm_kernel_16x4_haswell.S">strojnom kodu</a>
+koji je prilagođen za konkretnu mikroarhitekturu.
+Nadalje, ako je OpenBLAS konfiguriran da koristi OpenMP,
+u naš algoritam biti će upregnute sve procesorske jezgre
+- a to bi rezultiralo dodatnim ubrzanjem. 
+Neke konkretne brojeve možete pogledati
+<!--<a href="http://www.wandoujia.com/items/4818233864334650699">ovdje</a>-->
+<a href="https://attractivechaos.wordpress.com/2016/08/28/optimizing-matrix-multiplication/">ovdje</a>
+(u tim eksperimentima OpenMP je bio isključen).
+
+
+<h4 id="z0g">0g. Uvod u Python</h4>
+
+<p>
+Python je moderni dinamički jezik opće namjene
+koji je zbog svoje univerzalne primjenljivosti
+postao iznimno popularan u područjima vezanim
+uz umjetnu inteligenciju.
+Ako niste položili Skriptne jezike,
+predlažemo da samostalno proučite
+<a href="http://www.zemris.fer.hr/~kalfa/SJ/Skriptni_jezici_2012.pdf">skriptu</a> ili 
+<a href="https://element.hr/artikli/639/python-za-znatizeljne">knjigu</a>.
+Koristit ćemo Python 3. Preporučamo vam da isprobate
+naprednu interaktivnu ljusku ipython.
+
+<p>
+Izvorni kod u Pythonu smještamo u datoteke
+koje nazivamo modulima.
+Svaki modul u sebi treba sadržavati
+kratki ispitni program
+koji testira funkcionalnost modula i
+ilustrira njegovo pravilno korištenje.
+Ispitne programe smještamo na kraj modula
+u tijelu uvjetne naredbe koja testira
+je li modul pokrenut kao glavni program.
+Na taj način omogućavamo provođenje testiranja
+jednostavnim izvršavanjem modula.
+<pre><code class="python">  if __name__=="__main__":
+    # test, test, test!
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Postoji više načina za debuggiranje u Pythonu.
+Jedan od najzgodnijih oslanja se na
+ugrađeni Pythonov debugger <code>pdb</code>
+kojeg možemo pozvati izravno iz koda.
+Da bismo to proveli, potrebno je prvo
+uključiti odgovarajući modul:
+<pre><code class="python">  import pdb
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre> 
+
+<p>
+Zatim, na mjestu gdje želimo prekinuti izvođenje
+(breakpoint!) navedemo poziv:
+<pre><code class="python">  pdb.set_trace()
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre> 
+
+<p>
+Nakon tog poziva Python će otvoriti interaktivnu 
+<a href="https://pythonconquerstheuniverse.wordpress.com/2009/09/10/debugging-in-python/">ljusku</a>
+u kojoj će biti dostupna sva imena programa
+koja su bila vidljiva u trenutku poziva funkcije
+<code>set_trace</code>.
+Iz ljuske možemo ispisivati objekte,
+pozivati proizvoljne funkcije (!)
+i izvršavati proizvoljne naredbe Pythona (!).
+Pored toga, na raspolaganju nam je i čitav niz
+specijalnih naredbi za debuggiranje.
+Popis tih naredbi dobivamo naredbom <code>help</code>
+(neke od važnijih naredbi su <code>up</code>,
+ <code>down</code> i <code>continue</code>).
+Sličan učinak možemo postići i pozivom funkcije
+<code>IPython.embed()</code>
+(međutim, tu naredbe za debuggiranje nisu dostupne).
+
+<p>
+Na kraju ćemo pokazati kako debuggirati kod
+koji baca neočekivane iznimke
+na sljedećem minimalnom primjeru:
+<pre><code class="python">  def proba():
+    a=5
+    raise ValueError("Iznimka!")
+  
+  if __name__=="__main__":
+    proba()
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Testiranjem ovog programa vrlo lako se možemo uvjeriti
+da njegovo izvršavanje završava iznimkom 
+<code>ValueError</code>.
+Malo teže je međutim doći do podrobnijih informacija
+o stanju programa na mjestu gdje se iznimka dogodila,
+poput npr. ispisivanja vrijednosti imena <code>a</code>.
+Problem možemo riješiti pokretanjem debuggera
+<code>pdb proba.py</code>
+te zadavanjem naredbe <code>continue</code>
+(skraćeno "<code>c</code>").
+Dubugger će početi izvoditi program 
+te kad dođe do neuhvaćene iznimke
+omogućit će nam uvid u stanje programa
+preko tekstovnog korisničkog sučelja.
+Primjerice, naredba <code>print a</code>
+će ispisati vrijednost imena <code>a</code>
+neposredno prije bacanja iznimke.
+Do debuggera možemo doći i
+iz alternativne ljuske <code>ipython</code>
+na način da nakon interaktivnog poziva
+čije izvršavanje završava neuhvaćenom iznimkom
+zadamo naredbu <code>debug</code>.
+
+<p>
+Ovaj tekst pretpostavlja rad u čistom Pythonu,
+a ne korištenje posrednika poput Jupytera i sl.
+Ako vam se sviđa, slobodno koristite Jupyter,
+ali ne garantiramo da će sve raditi
+kako piše u ovim uputama.
+
+
+<h4 id="z0h">0h. Uvod u Numpy</h4>
+
+<p>
+<a href="http://www.zemris.fer.hr/~ssegvic/project/pubs/kralj16sem.pdf">Numpy</a> je popularna numerička biblioteka za Python.
+U primjerima ćemo koristiti standardnu pokratu <code>np</code>
+do koje dolazimo naredbom:
+<pre><code class="python">  import numpy as np
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+<a href="http://matplotlib.org/">Matplotlib</a>
+je biblioteka koja se često kombinira s numpyjem,
+a služi za izradu raznih vrsta grafova u Pythonu.
+U primjerima ćemo koristiti standardnu pokratu <code>plt</code>
+do koje dolazimo naredbom:
+<pre><code class="python">  import matplotlib.pyplot as plt
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Važna prednosti numpyja jest
+mogućnost svođenja iterativnih postupaka  
+na vektorske i matrične izraze.
+Za primjer, pogledajmo kako bismo u numpyju izrazili
+afinu transformaciju podataka koja predstavlja
+važan korak pri učenju logističke regresije.
+Neka su podatci zadani numpyjevom matricom
+<code>X</code> dimenzija NxD
+(svaki redak odgovara jednom D-dimenzijskom podatku),
+neka je transponirana matrica težina \(\mathbf{W}^\top\)
+zadana numpyjevom matricom <code>W_t</code> dimenzija DxC
+te neka je transponirani vektor pomaka \(\mathbf{b}^\top\)
+zadan numpyjevim vektorom <code>b_t</code> dimenzija 1xC.
+Tada afinu transformaciju <em>svih</em> podataka
+dobivamo jednostavnim pozivom numpyjevih funkcija
+za matrično množenje i zbrajanje:
+<pre><code class="python"> H = np.dot(X, W_t) + b_t
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Obratimo međutim pozornost na jedan detalj
+koji bi nakon površnog pogleda mogao i promaknuti.
+Pažljivom analizom prikazane naredbe Pythona
+uočavamo da dimenzije pribrojnika ne odgovaraju:
+matrični umnožak <code>np.dot(X, W_t)</code>
+ima dimenzije NxC dok vektor <code>b_t</code>
+ima dimenziju 1xC (N != 1).
+Biblioteka numpy takva nesuglasja rješava
+pod pretpostavkom da vektor <code>b_t</code>
+treba dodati *svakom* retku matričnog umnoška.
+Stoga će nakon izvršavanja naredbe dodjeljivanja
+ime <code>H</code> uistinu referencirati matricu
+čiji retci odgovaraju afino transformiranim
+retcima podatkovne matrice.
+Kad se podsjetimo da se i-ti podatak
+nalazi u i-tom retku matrice podataka
+(\(\mathbf{x}_{i} = \mathbf{X}_{i:}^\top\)),
+konačnu vrijednost i-tog retka matrice <code>H</code>
+moći ćemo zapisati i sljedećim izrazom:
+\(\mathbf{H}_{i:}^\top =
+  \mathbf{W} 
+  \cdot
+  \mathbf{x}_{i}
+  +
+  \mathbf{b}
+\).
+
+<p>
+Upravo smo vidjeli da numpy po potrebi
+automatski <em>umnožava</em>
+operand manje dimenzionalnosti
+(engleski termin je broadcasting)
+kako bi došao do valjanog izraza.
+Ovakvo izražavanje je ispočetka vrlo teško prihvatiti,
+ali nakon nekog vremena postaje jasno 
+da prednosti (sažetost i efikasnost)
+uvjerljivo nadjačavaju nedostatke.
+
+
+
+<h4 id="z1">1. Stvaranje umjetnog skupa 2D podataka</h4>
+
+<p>
+Rješenje ove vježbe slobodno preuzmite
+<a href="src/data.py">ovdje</a>.
+
+<p>
+Ponovite Python, numpy, i matplotlib 
+prema odjeljcima
+<a href="#z0g">0g</a> i
+<a href="#z0h">0h</a>.
+
+<p>
+U ovoj vježbi ćemo izvesti razred <code>Random2DGaussian</code>
+koji će nam omogućiti uzorkovanje 2D podataka
+generiranih slučajnom Gaussovom distribucijom. 
+Konstruktor razreda treba stvarati parametre
+slučajne bivarijatne Gaussove razdiobe (vektor μ i matricu Σ).
+Metoda <code>get_sample(n)</code> treba vratiti
+<code>n</code> slučajno uzorkovanih
+2D podataka u numpyjevom polju dimenzija Nx2.
+Položaj i varijanca razdiobe trebaju biti ograničeni
+fiksnim parametrima.
+
+<p>
+Pomoć:
+<ul><li>
+  Definirajte raspon prihvatljivih vrijednosti
+  za obje koordinate sredine razdiobe μ
+  (npr.
+   <code>minx=0</code>, <code>maxx=10</code>,
+   <code>miny=0</code>, <code>maxy=10</code>);
+  neka to budu podatkovni članovi razreda.
+<li>
+  Slučajno izaberite sredinu razdiobe μ
+  prema uniformnoj razdiobi
+  (<code>np.random.random_sample</code>).
+<li>
+  Slučajno odaberite svojstvene vrijednosti
+  kovarijacijske matrice Σ prema uniformnoj razdiobi
+  i organizirajte ih u dijagonalnu matricu D.
+  Neka gornja granica svojstvenih vrijednosti
+  ovisi o rasponu prihvatljivih vrijednosti parametra μ,
+  npr.
+  <pre><code class="python">  eigvalx = (np.random.random_sample()*(maxx - minx)/5)**2
+  </code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+<li>
+  Slučajno odaberite kut rotacije kovarijacijske matrice
+  i na temelju njega formirajte rotacijsku matricu 
+  \(R=\left [\begin{matrix}
+    \cos(\varphi)&-\sin(\varphi)\\
+    \sin(\varphi)&\cos(\varphi)
+    \end{matrix}\right ]\;.\)
+<li>
+  Odredite matricu Σ kao umnožak transponirane matrice R,
+  matrice D i matrice R.
+<li>
+  Za uzorkovanje koristite funkciju
+  <code>np.random.multivariate_normal</code>.
+<li>
+  Kako biste osigurali ponovljivost eksperimenata
+  sa slučajno generiranim podatcima,
+  numpyjev generator slučajnih brojeva
+  slobodno inicijalizirajte na konstantu:
+  <pre><code class="python">  np.random.seed(100)
+  </code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre> 
+</ul>
+
+<p>
+Ispravnost koda provjerite sljedećim ispitnim programom:
+<pre><code class="python">  if __name__=="__main__":
+    G=Random2DGaussian()
+    X=G.get_sample(100)
+    plt.scatter(X[:,0], X[:,1])
+    plt.show()
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Ovisno o stanju generatora slučajnih brojeva,
+vaš rezultat mogao bi izgledati kao na sljedećoj slici:
+
+<p>
+<img src="figures/data.png" alt="data"> 
+
+<p>
+Ako je rezultat prihvatljiv, pohranite kod
+u datoteku <code>data.py</code>.
+
+
+<h4 id="z2">2. Učenje binarne logističke regresije gradijentnim spustom</h4>
+
+<p>
+Ponovite binarnu logističku regresiju
+prema odjeljcima
+<a href="#z0d">0d</a> i
+<a href="#z0e">0e</a>.
+
+<p>
+Napišite funkciju <code>binlogreg_train</code>
+koja optimizira parametre logističke regresije
+\(\mathbf{w}\) i \(b\) na zadanom skupu podataka za učenje.
+U vašem izvornom kodu koristite sljedeća imena:
+<ul><li>
+  <code>X</code>: matrica podataka dimenzija NxD;
+<li>
+  <code>Y_</code>: vektor <em>točnih</em> razreda podataka
+     dimenzija Nx1
+     (koristimo ga tijekom učenja);
+<li>
+  <code>Y</code>: vektor <em>predviđenih</em> razreda podataka
+     dimenzija Nx1
+     (koristimo ga tijekom ispitivanja performanse).
+</ul>
+
+<p>
+Neka funkcija ima sljedeće sučelje:
+<pre><code class="python">def binlogreg_train(X,Y_):
+  '''
+    Argumenti
+      X:  podatci, np.array NxD
+      Y_: indeksi razreda, np.array Nx1
+
+    Povratne vrijednosti
+      w, b: parametri logističke regresije
+  '''
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Upute:
+<ul>
+<li>
+  Inicijalizirajte w prema normalnoj distribuciji N(0,1)
+  (np.random.randn) te b na nulu.
+<li>
+  Otvorite petlju gradijentnog spusta.
+  Broj iteracija postupka zadajte
+  hiper-parametrom <code>param_niter</code>.
+  <ul>
+  <li>
+    Izračunajte klasifikacijske mjere svih podataka
+    na način da petlje prepustite numpyju
+    (<code>scores = np.dot(X, w) + b</code>).
+  <li>
+    Izračunajte aposteriorne vjerojatnosti razreda
+    u svim podatcima
+    \(P(c_1|\mathbf{X})\)
+    na način da petlje prepustite numpyju
+  <li>
+    Izračunajte gubitak
+    \(\mathcal{L}(\mathbf{w},\mathbf{b})\)
+    na način da petlje prepustite numpyju.
+  <li>
+    Izračunajte gradijente
+    <code>grad_w</code> i
+    <code>grad_b</code>
+    na način da petlje prepustite numpyju.
+  <li>
+    Izmijenite parametre u smjeru negativnog gradijenta
+    (neka faktor pomaka <code>param_delta</code>
+     bude hiper-parametar postupka).
+  </ul>
+</ul>
+  
+<p>
+Struktura vaše izvedbe gradijentnog spusta
+trebala bi izgledati ovako:
+<pre><code class="python">   # gradijentni spust (param_niter iteracija)
+  for i in range(param_niter):
+    # klasifikacijske mjere
+    scores = ...    # N x 1
+    
+    # vjerojatnosti razreda c_1
+    probs = ...     # N x 1
+
+    # gubitak
+    loss  = ...     # scalar
+    
+    # dijagnostički ispis
+    if i % 10 == 0:
+      print("iteration {}: loss {}".format(i, loss))
+
+    # derivacije gubitka po klasifikacijskim mjerama
+    dL_dscores = ...     # N x 1
+    
+    # gradijenti parametara
+    grad_w = ...     # D x 1
+    grad_b = ...     # 1 x 1
+
+    # poboljšani parametri
+    w += -param_delta * grad_w
+    b += -param_delta * grad_b
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+<p>
+Napišite funkciju <code>binlogreg_classify</code>
+koja klasificira zadani skup podataka
+u skladu sa zadanim parametrima logističke regresije.
+Neka funkcija ima sljedeće sučelje:
+<pre><code class="python">'''
+  Argumenti
+      X:    podatci, np.array NxD
+      w, b: parametri logističke regresije 
+
+  Povratne vrijednosti
+      probs: vjerojatnosti razreda c1
+'''
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Napišite funkciju <code>sample_gauss_2d(C, N)</code>
+koja stvara <code>C</code> slučajnih
+bivarijatnih Gaussovih razdioba
+(prisjetimo se, njih smo u zadatku 1
+ implementirali razredom <code>Random2DGaussian</code>),
+te iz svake od njih uzorkuje <code>N</code> podataka.
+Funkcija treba vratiti matricu <code>X</code>
+dimenzija (N·C)x2
+čiji retci odgovaraju uzorkovanim podatcima
+te matricu točnih razreda <code>Y</code>
+dimenzija (N·C)x1
+čiji jedini stupac sadrži indeks razdiobe
+iz koje je uzorkovan odgovarajući podatak.
+Ako je <emph>i-ti</emph> redak matrice <code>X</code>
+uzorkovan iz razdiobe <emph>j</emph>,
+onda mora biti <code>Y[i,0]==j</code>.
+
+<p>
+Napišite funkciju <code>eval_perf_binary(Y,Y_)</code>
+koja na temelju predviđenih i točnih indeksa razreda
+određuje pokazatelje performanse binarne klasifikacije:
+točnost (engl. accuracy),
+preciznost (engl. precision)
+te odziv (engl. recall).
+Implementaciju te funkcije temeljite na brojnostima
+istinitih pozitiva (TP),
+lažnih pozitiva (FP),
+istinith negativa (TN)
+i lažnih negativa (FN).
+
+<p>
+Napišite funkciju <code>eval_AP</code> koja računa
+<a href="https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)#Average_precision">prosječnu preciznost</a>
+binarne klasifikacije.
+Neka funkcija na ulazu prima
+rangiranu listu točnih razreda \(\mathbf{Y_r}\)
+koju dobivamo kad matricu točnih razreda \(\mathbf{Y}\)
+sortiramo prema aposteriornim vjerojatnostima 
+odgovarajućih podataka \(P(c_1|\mathbf{x})\).
+Rangiranu listu točnih razreda možete dobiti 
+pozivom metode <code>argsort</code> numpyjevog polja.
+Prosječnu preciznost možete izračunati
+primjenom sljedećeg izraza:
+\(
+  \operatorname{AP} =
+  \frac{\sum_{i=0}^{N-1}
+          \mathrm{Preciznost}(i) \cdot \mathbf{Y_r}_i}
+       {\sum_{i=0}^{N-1} \mathbf{Y_r}_i} \; .
+\)
+Pri tome \(\mathrm{Preciznost}(i)\) odgovara preciznosti
+u slučaju kad podatke s indeksom većim ili jednakim \(i\)
+pridružimo razredu \(c_1\),
+a podatke s indeksom manjim od \(i\) - razredu \(c_0\).
+Evo kako bi se trebala ponašati vaša funkcija:
+<pre><code class="python">>>> import data
+>>> data.eval_AP([0,0,0,1,1,1])
+1.0
+>>> data.eval_AP([0,0,1,0,1,1])
+0.9166666666666666
+>>> data.eval_AP([0,1,0,1,0,1])
+0.7555555555555555
+>>> data.eval_AP([1,0,1,0,1,0])
+0.5
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Napišite ispitni kod za modul <code>binlogreg.py</code>.
+Formirajte skup za učenje pozivom 
+funkcije <code>sample_gauss_2d</code>.
+Pozovite funkciju za učenje
+te nakon toga provedite klasifikaciju
+primjera za učenje.
+Predviđene vjerojatnosti podataka
+pretvorite u indekse razreda Y
+pod pretpostavkom odabira razreda
+s najvećom vjerojatnošću
+(izbjegnite petlju u Pythonu!).
+Ispišite pokazatelje performanse
+dobivene pozivima funkcija
+<code>eval_perf_binary</code> te
+<code>eval_AP</code>.
+Neka vaš ispitni kod izgleda kako slijedi.
+<pre><code class="python">  if __name__=="__main__":
+    np.random.seed(100)
+
+    # get the training dataset
+    X,Y_ = data.sample_gauss_2d(2, 100)
+
+    # train the model
+    w,b = binlogreg_train(X, Y_)
+
+    # evaluate the model on the training dataset
+    probs = binlogreg_classify(X, w,b)
+    Y = # TODO
+
+    # report performance
+    accuracy, recall, precision = data.eval_perf_binary(Y, Y_)
+    AP = data.eval_AP(Y_[probs.argsort()])
+    print (accuracy, recall, precision, AP)
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Ako vaš postupak ne postiže točnost od 100%,
+pokušajte naći objašnjenje.
+
+<p>
+Ako je rezultat prihvatljiv, pohranite kod
+u datoteku <code>binlogreg.py</code>. 
+Funkcije <code>sample_gauss_2d</code>,
+<code>eval_AP</code> i <code>eval_perf_binary</code>
+pohranite u datoteku <code>data.py</code>.
+
+<p>
+Dodatni zadatci za radoznale.
+<ul>
+<li>
+  Provjerite poklapaju li se
+  vrijednosti analitičkih gradijenata
+  s njihovim numeričkim aproksimacijama
+  (engl. gradient checking).
+<!--
+<li>
+  Dodajte regularizacijski član gubitka
+  u obliku kvadrata L2 norme težina w pomnožene
+  hiper-parametrom <code>param_lambda</code>
+  (parametre b najčešće nema smisla regularizirati).
+  Ne zaboravite izraziti utjecaj te promjene na gradijente.
+-->
+<li>
+  Eksperimentirajte s različitim vrijednostima
+  hiper-parametara
+  <code>param_niter</code>,
+  <code>param_delta</code>
+  i <code>param_lambda</code>.
+  Pronađite kombinacije hiper-parametara
+  za koje vaš program ne uspijeva pronaći zadovoljavajuće rješenje
+  i objasnite što se događa.
+<li>
+  Smislite način za vizualiziranje
+  plohe funkcije gubitka
+  i napredovanje postupka optimizacije.
+<li>
+  Procijenite pristranost (eng. bias) i varijancu 
+  vašeg postupka većim brojem eksperimenata
+  na podatcima za testiranje.
+  Podatke za testiranje dobijte uzorkovanjem
+  iste podatkovne distribucije koja je korištena
+  za dobivanje skupa za učenje.
+  Možete li zadati distribuciju podataka
+  za koju će pristranost klasifikatora biti vrlo velika?
+</ul>
+
+<h4 id="z3">3. Grafički prikaz rezultata klasifikacije</h4>
+
+<p>
+Rješenje ovog zadatka slobodno preuzmite
+<a href="src/data.py">ovdje</a>.
+
+<p>
+Napišite funkciju <code>graph_data</code>
+za vizualiziranje rezultata 
+binarne klasifikacije 2D podataka.
+Neka funkcija ima sljedeće parametre.
+<pre><code class="python">'''
+  X  ... podatci (np.array dimenzija Nx2)
+  Y_ ... točni indeksi razreda podataka (Nx1)
+  Y  ... predviđeni indeksi razreda podataka (Nx1)
+'''
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Upute:
+<ul>
+<li>
+  Podatke iscrtajte funkcijom <code>plt.scatter</code>;
+  koristite imenovane argumente <code>c</code> i
+  <code>marker</code> za zadavanje
+  boje, veličine i oblika simbola koji predstavljaju podatke.
+<li>
+  Točan razred podatka prikažite bojom simbola:
+  razred 0 iscrtajte sivom, a razred 1 bijelom bojom.
+<li>
+  Točno klasificirane podatke 
+  (<code>Y_==Y</code>) prikažite kružićima,
+  a netočno klasificirane podatke kvadratima.
+  Kako biste izbjegli petlju u Pythonu,
+  funkciju <code>plt.scatter</code>
+  možete pozvati dva puta: jednom za točno klasificirane,
+  a jednom za netočno klasificirane podatke.
+</ul>
+  
+<p>
+Ispitajte vaš dosadašnji kod na podatcima
+generiranim dvjema slučajnim razdiobama.
+Za potrebe prvog testiranja,
+predviđene indekse razrede podataka (<code>Y</code>)
+odredite proizvoljnom funkcijom odluke, npr:
+<pre><code class="python">  def myDummyDecision(X):
+    scores = X[:,0] + X[:,1] - 5
+    return scores
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Vaš novi ispitni program za modul <code>data</code>
+mogao bi izgledati ovako:
+<pre><code class="python">  if __name__=="__main__":
+    np.random.seed(100)
+  
+    # get the training dataset
+    X,Y_ = data.sample_gauss_2d(2, 100)
+  
+    # get the class predictions
+    Y = myDummyDecision(X)>0.5
+  
+    # graph the data points
+    graph_data(X, Y_, Y) 
+  
+    # show the results
+    plt.show()
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Ako koristimo istu verziju generatora slučajnih brojeva,
+vaš rezultat sada bi trebao izgledati kao na sljedećoj slici:
+
+<p>
+<img src="figures/graph_data.png" alt="graph_data"> 
+
+<p>
+Funkcija odluke <code>myDummyDecision</code>
+mijenja vrijednost po dijagonali sjeverozapad-jugoistok,
+a njena granica prolazi blizu dna nakupine "bijelih".
+Stoga su "bijeli" podatci uglavnom
+ispravno klasificirani (kružići),
+dok su svi "sivi" podatci neispravno klasificirani (kvadrati).
+
+<p>
+Ako je rezultat ispitivanja prihvatljiv,
+pohranite kod u datoteku <code>data.py</code>.
+
+
+<h4 id="z4">4. Iscrtavanje funkcije odluke</h4>
+
+<p>
+Rješenje ovog zadatka slobodno preuzmite
+<a href="src/data.py">ovdje</a>.
+
+<p>
+U praksi, funkcije odluke klasifikatora 
+najčešće ne vraćaju predviđeni razred podatka
+kao što je to bio slučaj kod
+naše funkcije <code>myDummyDecision</code>.
+Primjerice, funkcija odluke
+stroja s potpornim vektorima
+vraća klasifikacijske mjere.
+Predznak rezultata određuje predviđeni razred,
+a granicu između dvaju razreda čine podatci
+u kojima je klasifikacijska mjera jednaka nuli.
+Binarna logistička regresija vraća
+aposteriornu vjerojatnost \(P(Y=c_1|\mathbf{x})\).
+Ako je ta vjerojatnost veća od 0.5, 
+klasifikator predviđa razred \(c_1\),
+a granicu čine podatci u kojima je 
+ta vjerojatnost jednaka 0.5.
+Jednaku interpretaciju najčešće imaju i
+funkcije odluke dubokih klasifikatora koji,
+za razliku od logističke regresije,
+mogu modelirati i vrlo nelinearne granice među razredima.
+Kod svih navedenih klasifikatora
+oblik funkcije odluke pruža kvalitativan uvid
+u ono što je klasifikator naučio.
+
+<p>
+Stoga ćemo se u ovom zadatku posvetiti 
+vizualizaciji funkcije odluke.
+Naš cilj je razviti potprogram <code>graph_surface</code>
+koji iscrtava plohu zadane skalarne funkcije 2D varijable
+kako bismo njime mogli iscrtavati plohe funkcije odluke
+klasifikatora dvodimenzionalnih podataka.
+Potprogram <code>graph_surface</code>
+treba imati sljedeće argumente:
+<pre><code class="python">'''
+  fun    ... decizijska funkcija (Nx2)->(Nx1)
+  rect   ... željena domena prikaza zadana kao:
+             ([x_min,y_min], [x_max,y_max])
+  offset ... "nulta" vrijednost decizijske funkcije na koju 
+             je potrebno poravnati središte palete boja;
+             tipično imamo:
+             offset = 0.5 za probabilističke modele 
+                (npr. logistička regresija)
+             offset = 0 za modele koji ne spljošćuju
+                klasifikacijske mjere (npr. SVM)
+  width,height ... rezolucija koordinatne mreže
+'''
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Kao i kod potprograma <code>graph_data</code>
+naš kod će biti tanak omotač oko biblioteke
+<a href="http://matplotlib.org/mpl_toolkits/mplot3d/tutorial.html#surface-plots">matplotlib</a>.
+Kako bismo pozivatelja zaštitili
+od izvedbenih detalja iscrtavanja,
+argument <code>fun</code>
+potprograma <code>graph_surface</code>
+predstavlja funkciju odluke
+(radi se o oblikovnom obrascu Strategija). 
+Funkcija odluke <code>fun</code>
+preslikava podatke u numeričke vrijednosti
+koje određuju predviđeni razred odgovarajućeg podatka
+pa će to u praksi biti tanak omotač
+oko klasifikatora koejg želimo vizualizairati.
+Kako bismo izbjegli potrebu
+za višestrukim pozivanjem iz pythonskih petlji,
+funkcija odluke treba primiti podatkovnu matricu NxD,
+te vratiti vektor klasifikacijskih mjera dimenzija Nx1.
+Argument <code>rect</code>
+potprograma <code>graph_surface</code>
+zadaje dio podatkovnog vektorskog prostora
+u kojem treba vizualizirati funkciju odluke.
+U praksi, taj argument će ovisiti o rasponu podataka:
+nema smisla prikazivati funkciju odluke
+u dijelovima prostora gdje nema podataka za učenje.
+Potprogram <code>graph_surface</code> 
+treba primiti i argument <code>offset</code>
+koji zadaje vrijednost funkcije odluke
+koja predstavlja granicu između razreda.
+Za probabilističke modele ta granica će biti 0.5,
+dok ćemo kod modela koji maksimiziraju marginu
+tu granicu postaviti na 0.
+Konačno, potprogram <code>graph_surface</code> 
+treba primiti i dimenzije koordinatne mreže
+koje će definirati zrnatost vizualizacije.
+
+<p>
+Plohe u matplotlibu iscrtavamo primjenom funkcija
+<code>np.meshgrid</code> i <code>plt.pcolormesh</code>,
+kao što je to pokazano u ovom
+<a href="http://stackoverflow.com/questions/14741771/how-to-arrange-the-data-for-a-heatmap-pcolormesh">primjeru</a>
+i službenoj
+<a href="http://matplotlib.org/api/pyplot_api.html#matplotlib.pyplot.pcolormesh">dokumentaciji</a>
+biblioteke Matplotlib.
+Kako ta procedura nije baš najintuitivnija,
+za ovaj zadatak ćemo dati nešto detaljnije instrukcije.
+
+<ul>
+<li>
+  Izradite 1D koordinatne raspone rezolucije
+  <code>width</code>×<code>height</code>
+  u okvirima zadanog pravokutnika <code>rect</code>
+  korištenjem funkcije <code>np.linspace</code>
+  (ili <code>np.arange</code>).
+<li>
+  Izradite 2D koordinatnu mrežu pozivom 
+  <code>np.meshgrid</code>.
+<li>
+  Izrazite koordinatnu mrežu 2D matricom dimenzija Nx2.
+  Ovaj korak nam treba kako bismo koordinatnu mrežu
+  mogli koristiti kao parametar decizijske funkcije.
+  Koristite metodu <code>flatten</code> i
+  funkciju <code>np.stack</code>
+<li>
+  Pozovite decizijsku funkciju kako biste dobili
+  njene vrijednosti u točkama koordinatne mreže.
+  Preoblikujte dobivene vrijednosti u oblik
+  kojeg zahtijeva funkcija <code>plt.pcolormesh</code>
+  metodom <code>reshape</code>.
+<li>
+  Iscrtajte plohu pozivom funkcije <code>plt.pcolormesh</code>.
+  Koristite argumente <code>vmin</code> i <code>vmax</code>
+  tako da paletu centrirate u vrijednosti <code>offset</code>
+  te tako da sve vrijednosti funkcije budu u dometu palete.
+<li>
+  Iscrtajte konturu uzduž koje decizijska funkcija
+  poprima vrijednost <code>offset</code>.
+  Koristite crnu boju.
+</ul>
+  
+<p>
+Evo kako bismo predloženim potprogramom
+iscrtali plohu decizijske funkcije <code>myDummyDecision</code>
+u pravokutniku određenom koordinatama skupa točaka <code>X</code>.
+<pre><code class="python">    bbox=(np.min(X, axis=0), np.max(X, axis=0))
+    graph_surface(myDummyDecision, bbox, offset=0)
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Ako ovaj odsječak uvrstimo u ispitni program 
+modula <code>data.py</code> neposredno prije poziva
+funkcije <code>graph_data</code>,
+ispod naših podataka osvanut će
+decizijska ploha u duginim bojama.
+Točke u kojima decizijska funkcija poprima vrijednost praga
+označene su crnom linijom.
+Bijeli podatci iznad crne linije označeni su kružićima
+(<code>myDummyClassifier</code> ih je dobro klasificirao).
+Bijeli podatci ispod linije i crni podatci iznad linije
+označeni su kvadratićima 
+(<code>myDummyClassifier</code> ih je loše klasificirao).
+
+<p>
+<img src="figures/graph_surface.png" alt="graph_data">
+
+<p>
+Ako je rezultat ispitivanja prihvatljiv,
+pohranite kod u datoteku <code>data.py</code>.
+
+<h4 id="z5">5. Grafički prikaz binarne logističke regresije</h4>
+
+<p>
+Sada imamo gotovo sve sastojke za konačnu provjeru
+naše implementacije binarne logističke regresije.
+Nedostaje nam samo funkcija koja bi bila prikladna
+za slanje potprogramu <code>graph_surface</code>.
+U slučaju binarne logističke regresije,
+željena funkcija trebala bi primiti podatke <code>X</code>,
+a vratiti vektor aposteriorne vjerojatnosti razreda.
+Funkcija <code>binlogreg_classify</code>
+izgleda kao obećavajući kandidat,
+ali ne može se izravno primijeniti 
+jer prima dva argumenta viška
+(<code>w</code> i <code>b</code>).
+U programskim jezicima sa statičkim funkcijama
+ovaj izazov bismo teško riješili bez globalnih varijabli.
+Međutim, u Pythonu ovo možemo lakoćom izvesti
+primjenom kontekstne funkcije (engl. closure)
+koju možemo konstruirati pozivom sljedeće funkcije:
+<pre><code class="python">  def binlogreg_decfun(w,b):
+    def classify(X):
+      return binlogreg_classify(X, w,b)
+    return classify
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Funkcija <code>binlogreg_decfun</code>
+vraća lokalnu funkciju koja pamti kontekst (w,b).
+Stoga tu lokalnu funkciju možemo koristiti
+kao argument funkcije <code>graph_surface</code>
+(radi se o oblikovnom obrascu Dekorator).
+Prikazana fukcionalnost može se sažetije ostvariti
+lambda izrazom (napravite to za vježbu!).
+Početnicima savjetujemo da napreduju malim koracima
+te da lambda izraze koji pamte kontekst
+počnu koristiti tek nakon što
+u potpunosti usvoje kontekstne funkcije.
+
+<p>
+Sada konačno možemo iscrtati rezultate
+naše izvedbe binarne logističke regresije sljedećim kodom:
+<pre><code class="python">  # instantiate the dataset
+  # ...
+
+  # train the logistic regression model
+  # ...
+  
+  # evaluate the model on the train set
+  # ... 
+
+  # recover the predicted classes Y
+  # ...
+
+  # evaluate and print performance measures
+  # ...
+
+  # graph the decision surface
+  decfun = binlogreg_decfun(w,b)
+  bbox=(np.min(X, axis=0), np.max(X, axis=0))
+  data.graph_surface(decfun, bbox, offset=0.5)
+  
+  # graph the data points
+  data.graph_data(X, Y_, Y, special=[])
+
+  # show the plot
+  plt.show()
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Ovisno o stanju generatora slučajnih brojeva
+te vrijednostima hiper-parametara
+vaš rezultat mogao bi izgledati kao na sljedećoj slici:
+
+<p>
+<img src="figures/binlogreg.png" alt="data"> 
+
+<p>
+Ako sliku izradimo u svakoj iteraciji postupka,
+dobivamo sljedeću animaciju.
+Pokušajte objasniti razlike između
+konačnog stanja ove animacije
+i funkcije odluke koja je prikazana na prethodnoj slici.
+
+<p>
+<img src="figures/binlogreg_anim.gif" alt="data"> 
+
+<h4 id="z6">6. Višerazredna logistička regresija</h4>
+
+<p>
+Ponovite višerazrednu logističku regresiju
+prema odjeljcima
+<a href="#z0d">0d</a> i
+<a href="#z0f">0f</a>.
+
+<p>
+Naš konačni zadatak je napisati kod za učenje i primjenu
+logističke regresije nad podatcima proizvoljnog broja razreda.
+Potrebno je napisati funkciju <code>logreg_train</code> 
+koja kao argumente prima podatkovnu matricu <code>X</code>
+i matricu indeksa točnih razreda <code>Y_</code>.
+Na izlazu je potrebno vratiti parametre
+logističke regresije <code>W</code> i <code>b</code>.
+Dimenzije tih parametara trebaju ovisiti
+o broju razreda <code>C</code>
+kojeg možete odrediti izrazom <code>max(Y_) + 1</code>.
+
+<p>
+Struktura tijela petlje gradijentnog spusta
+trebala bi izgledati ovako:
+<pre><code class="python">  # eksponencirane klasifikacijske mjere
+    # pri računanju softmaksa obratite pažnju
+    # na odjeljak 4.1 udžbenika
+    # (Deep Learning, Goodfellow et al)!
+    scores = ...    # N x C
+    expscores = ... # N x C
+    
+    # nazivnik sofmaksa
+    sumexp = ...    # N x 1
+
+    # logaritmirane vjerojatnosti razreda 
+    probs = ...     # N x C
+    logprobs = ...  # N x C
+
+    # gubitak
+    loss  = ...     # scalar
+    
+    # dijagnostički ispis
+    if i % 10 == 0:
+      print("iteration {}: loss {}".format(i, loss))
+
+    # derivacije komponenata gubitka po mjerama
+    dL_ds = ...     # N x C
+
+    # gradijenti parametara
+    grad_W = ...    # C x D (ili D x C)
+    grad_b = ...    # C x 1 (ili 1 x C)
+
+    # poboljšani parametri
+    W += -param_delta * grad_W
+    b += -param_delta * grad_b
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre>
+
+<p>
+Napišite funkciju <code>logreg_classify</code> 
+koja kao rezultat vraća matricu dimenzija NxC
+gdje svaki redak <code>i</code> sadrži vjerojatnosti
+klasificiranja podatka \(\mathbf{x_i}\)
+u razrede \(c_j\), \(j \in \{0, 1, ..., C-1\}\).
+
+<p>
+Napišite funkciju <code>eval_perf_multi(Y,Y_)</code>
+koja na temelju predviđenih i točnih indeksa razreda
+određuje pokazatelje klasifikacijske performanse:
+i) ukupnu točnost klasifikacije,
+ii) matricu 
+<a href="https://en.wikipedia.org/wiki/Confusion_matrix">zabune</a>
+ (engl. confusion matrix) u kojoj
+retci odgovaraju točnim razredima a stupci predikcijama
+te iii) vektore preciznosti i odziva 
+<a href="http://stats.stackexchange.com/questions/51296/how-to-calculate-precision-and-recall-for-multiclass-classification-using-confus">pojedinih</a> razreda.
+U implementaciji prvo izračunajte matricu zabune,
+a onda sve ostale pokazatelje na temelju nje.
+
+<!--TODO
+Izračunajte prosječnu preciznost za svaki razred.
+-->
+
+<p>
+Konstruirajte dekorator oko <code>logreg_classify</code> 
+koji omogućava evaluiranje modela
+iz funkcije <code>graph_surface</code>.
+Decizijsku plohu možete prikazati na više načina:
+<ul>
+<li>
+  kao vjerojatnost nekog određenog razreda,
+<li>
+  kao maksimalnu vjerojatnost klasificiranja
+  u bilo koji razred,
+<li>
+  kao razred koji ima najveću aposteriornu vjerojatnost.
+</ul>
+
+<p>
+Isprobajte vaš kod najprije za slučaj C=2.
+Trebali biste dobiti vrlo slične rezultate 
+kao i u binarnom slučaju.
+Nakon toga, provjerite što se zbiva
+kad vašem kodu pošaljete podatke uzorkovane
+iz tri slučajne Gaussove distribucije.
+Obratite pažnju da, kao i ranije,
+podatke iz svake pojedine distribucije
+valja označiti zasebnim razredom.
+Ovisno o stanju generatora slučajnih brojeva
+te vrijednostima hiper-parametara
+vaš rezultat mogao bi izgledati kao na sljedećoj slici:
+
+<p>
+<img src="figures/logreg_a.png" alt="data">
+
+<p>
+Ako je rezultat ispitivanja prihvatljiv,
+pohranite kod u datoteku <code>logreg.py</code>.
+
+</div>
+
+
+<footer id="footer">
+
+  <p>
+  Ove stranice sastavljaju Petra Bevandić,
+  Marin Oršić, Ivan Grubišić, Josip Šarić
+  i Siniša Šegvić.
+  </p>
+
+  <p>
+  Prva verzija ovih stranica bila je rezultat istraživačkog projekta 
+  <a href="http://multiclod.zemris.fer.hr">MULTICLOD</a> (I-2433-2014) Hrvatske zaklade za znanost.
+  </p>
+
+  <p>
+  Izrađeno
+  <a href="http://www.vim.org/">
+  vi
+  </a>
+  -jem i
+  <a href="http://www.gedit.org/">
+  gedit
+  </a>
+  om.
+  </p>
+
+
+  <p>
+  Svi komentari su dobrodošli:
+  <span>
+    <img alt="dubuce1 at fer hr" src="email.png" style="height: 0.9rem; display: inline; margin: 0; border: 0;"/>
+  </span>
+
+    <div style="float: left;">Posljednja promjena: 02-Mar-2026 18:35 CET</div>
+    <div style="float: right;"><a href="https://www.zemris.fer.hr/predmeti/du1/">Povratak</a></div>
+  </p>
+  </footer>
+
+</body>
+<script>hljs.highlightAll();</script> 
+</html>
+
