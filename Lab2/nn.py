@@ -55,6 +55,7 @@ def draw_conv_filters(epoch, step, layer, save_dir):
       r = int(j / cols) * (k + border)
       c = int(j % cols) * (k + border)
       img[r:r+k,c:c+k] = w[j,i]
+    img = (img * 255).astype(np.uint8)
     filename = '%s_epoch_%02d_step_%06d_input_%03d.png' % (layer.name, epoch, step, i)
     ski.io.imsave(os.path.join(save_dir, filename), img)
 

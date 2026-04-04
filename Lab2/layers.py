@@ -2,7 +2,8 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 import scipy
 import scipy.stats as stats
-from cython_dir.im2col_cython import col2im_cython  # type: ignore
+from cython_dir.im2col_cython import col2im_cython, im2col_cython # type: ignore
+
 
 zero_init = np.zeros
 
@@ -199,8 +200,8 @@ class FC(Layer):
     Returns:
       An ndarray of shape (N, num_outputs)
     """
-    # TODO
-    pass
+    self.inputs = inputs
+    return inputs.dot(self.weights.T) + self.bias
 
   def backward_inputs(self, grads):
     """
@@ -209,8 +210,7 @@ class FC(Layer):
     Returns:
       An ndarray of shape (N, num_inputs)
     """
-    # TODO
-    pass
+    return grads.dot(self.weights)
 
   def backward_params(self, grads):
     """
@@ -220,10 +220,9 @@ class FC(Layer):
       List of params and gradient pairs.
     """
     # TODO
-    grad_weights = ...
-    grad_bias = ...
+    grad_weights = grads.T.dot(self.inputs)
+    grad_bias = np.sum(grads, axis=0)
     return [[self.weights, grad_weights], [self.bias, grad_bias], self.name]
-
 
 
 class ReLU(Layer):
@@ -239,8 +238,8 @@ class ReLU(Layer):
     Returns:
       ndarray of shape (N, C, H, W).
     """
-    # TODO
-    pass
+    self.inputs = inputs
+    return np.maximum(0, inputs)
 
   def backward_inputs(self, grads):
     """
@@ -249,8 +248,9 @@ class ReLU(Layer):
     Returns:
       ndarray of shape (N, C, H, W).
     """
-    # TODO
-    pass
+    grad_inputs = grads.copy()
+    grad_inputs[self.inputs <= 0] = 0
+    return grad_inputs
 
 
 class SoftmaxCrossEntropyWithLogits():
@@ -266,10 +266,10 @@ class SoftmaxCrossEntropyWithLogits():
       Scalar, average loss over N examples.
       It is better to compute average loss here instead of just sum
       because then learning rate and weight decay won't depend on batch size.
-
     """
-    # TODO
-    pass
+    x_max = np.max(x, axis=1, keepdims=True)
+    sum_exp = np.sum(np.exp(x - x_max), axis=1, keepdims=True)
+    return -np.sum(y * (x - x_max - np.log(sum_exp))) / x.shape[0]
 
   def backward_inputs(self, x, y):
     """
@@ -279,9 +279,10 @@ class SoftmaxCrossEntropyWithLogits():
     Returns:
       Gradient with respect to the x, ndarray of shape (N, num_classes).
     """
-    # Hint: don't forget that we took the average in the forward pass
-    # TODO
-    pass
+    x_max = np.max(x, axis=1, keepdims=True)
+    x_exp = np.exp(x - x_max)
+    probs = x_exp / np.sum(x_exp, axis=1, keepdims=True)
+    return (probs - y) / x.shape[0]
 
 
 class L2Regularizer():
@@ -302,16 +303,14 @@ class L2Regularizer():
      Returns:
       Scalar, loss due to the L2 regularization.
     """
-    # TODO
-    pass
+    return 0.5 * self.weight_decay * np.sum(self.weights ** 2)
 
   def backward_params(self):
     """
     Returns:
       Gradient of the L2 loss with respect to the regularized weights.
     """
-    # TODO
-    grad_weights = ...
+    grad_weights = self.weight_decay * self.weights
     return [[self.weights, grad_weights], self.name]
 
 
