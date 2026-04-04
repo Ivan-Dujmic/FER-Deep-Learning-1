@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>Druga laboratorijska vježba iz Dubokog učenja</title>
+  <link rel="stylesheet" type="text/css" href="./dl.css" >
+  <link rel="stylesheet" href="./highlight/styles/default.min.css">
+  <script type="text/javascript" src="./mathjax/tex-mml-chtml.js"></script>
+  <script src="./highlight/highlight.min.js"></script>
+</head>
+
+
+    <body>
+
+      <div id="page">
+
+<h2 id="2-vježba-konvolucijski-modeli-cnn">2. vježba: konvolucijski modeli (CNN)</h2>
+
+<p>U ovoj vježbi bavimo se konvolucijskim modelima.
+Ti modeli prikladni su za obradu podataka s topologijom rešetke,
+gdje je osobito važno ostvariti kovarijantnost na translaciju.
+<!--(problem miješanja dimenzija u podacima).-->
+Dobar primjer takvih podataka su tipične RGB slike
+u kojima se isti objekt može pojaviti na mnogim prostornim lokacijama.
+Potpuno povezani slojevi nisu prikladni za analizu takvih slika
+jer svaka aktivacija ovisi o svim pikselima
+i tako od šume ne vidi stabla.
+Takav pristup bi ohrabrivao specijalizaciju aktivacija
+na pojedine dijelove slike, što bi značilo da bi model
+morao odvojeno učiti kako jedan te isti objekt
+izgleda u različitim dijelovima slike.
+Takva situacija pogodovala bi prenaučenosti,
+odnosno vodila bi na lošu generalizaciju.
+Osim toga dodatni problem je što slike
+tipično sadrže puno piksela.
+Na primjer, prosječne dimenzije slike
+iz poznatog skupa ImageNet iznose 3x200x200
+što znači da bi svaka aktivacija iz prvog sloja
+trebala imati 3*200*200=120,000 težina.
+Takva situacija je neodrživa
+jer je broj parametara ograničen memorijom GPU-a.</p>
+
+<p>Vidimo da bi puno bolje za nas bilo
+kad bi svaka aktivacija bila lokalno povezana
+s malenim susjedstvom prethodnog sloja,
+jer bi to uvelike smanjilo broj težina.
+Aktivacije u ranim slojevima imale bi malo receptivno polje
+i mogle bi modelirati samo jednostavne značajke
+koje bi detektirale jednostavne uzorke poput linija i rubova.
+Kasniji slojevi hijerarhijski bi gradili
+sve kompleksnije i kompleksnije značajke
+koje bi imale sve veće i veće receptivno polje.
+Nadalje, kovarijantnost na translacije unutar slike
+mogli bismo ostvariti dijeljenjem parametara
+aktivacija na različitim prostornim lokacijama.
+U takvoj organizaciji, latentne aktivacije sadrže
+izlaz istog podmodela na različitim lokacijama slike.
+Težine konvolucijskih slojeva obično nazivamo filtrima.
+Svaki filtar definira afinu transformaciju
+malenog lokalnog susjedstva prethodnog sloja
+koja se naknadno ulančava s nelinearnom aktivacijskom funkcijom.
+Tipično, lokalno susjedstvo filtra ima kvadratni oblik
+k✕k, k ∈ {3,5,7}, a nelinearnost je zglobnica.
+Da zaključimo, konvolucijski modeli koriste tri važne ideje:
+rijetku povezanost, dijeljenje parametara i
+ekvivarijantnost reprezentacije.</p>
+
+<div class="fig figcenter fighighlight">
+  <img src="./figures/vv_convnet.png" width="100%" />
+  <p>Primjer konvolucijskog modela za klasifikaciju slika.
+    Tipično se izmjenjuju konvolucijski slojevi i slojevi sažimanja.
+    Na kraju se dolazi do vektora značajki koji se potpuno povezanim slojem
+    preslikava u konačnu kategoričku distribuciju preko poznatih razreda.
+    Slika je preuzeta iz diplomskog rada
+     <a href="http://www.zemris.fer.hr/~ssegvic/project/pubs/vukotic14ms.pdf">Vedrana Vukotića</a>.
+  </p>
+</div>
+
+<p><a name="vjezba"></a></p>
+
+<h2 id="vježba">Vježba</h2>
+
+<p>Kod za prva dva zadatka nalazi se
+<a href="https://github.com/ivankreso/fer-deep-learning/tree/master/lab2">ovdje</a>.
+Biblioteke koje su vam potrebne za ovu vježbu su
+<a href="http://pytorch.org">PyTorch</a>,
+<a href="https://pytorch.org/docs/stable/torchvision/index.html">torchvision</a>,
+NumPy, <a href="http://cython.org">Cython</a>,
+<a href="http://matplotlib.org/">matplotlib</a> i <a href="http://scikit-image.org/">scikit-image</a>.
+Module Pythona najlakše je povući iz pipa.
+Druga opcija je koristiti distribucijske pakete.
+Pazite da odaberete verzije za Python 3.</p>
+
+<p>U datoteci <code class="language-plaintext highlighter-rouge">layers.py</code> nalaze se definicije slojeva
+od kojih se mogu graditi duboki konvolucijski modeli.
+Svaki sloj sadrži tri metode potrebne za izvođenje algoritma backprop.
+Metoda <code class="language-plaintext highlighter-rouge">forward</code> izvodi unaprijedni prolazak kroz sloj i vraća rezultat.
+Metode <code class="language-plaintext highlighter-rouge">backward_inputs</code> i <code class="language-plaintext highlighter-rouge">backward_params</code> izvode unatražni prolaz.
+Metoda <code class="language-plaintext highlighter-rouge">backward_inputs</code> računa gradijent s obzirom na ulazne podatke
+(\( \frac{∂L}{∂\mathbf{x}} \) gdje je \(\mathbf{x}\) ulaz u sloj).
+Metoda  <code class="language-plaintext highlighter-rouge">backward_params</code> računa gradijent s obzirom na parametre sloja (\( \frac{∂L}{∂\mathbf{w}} \) gdje vektor \(\mathbf{w}\) vektor predstavlja sve parametre sloja)).</p>
+
+<p><a name="1zad"></a></p>
+
+<h3 id="1-zadatak-25">1. zadatak (25%)</h3>
+<p>Dovršite implementacije potpuno povezanog sloja, sloja nelinearnosti
+te funkcije gubitka u razredima <code class="language-plaintext highlighter-rouge">FC</code>, <code class="language-plaintext highlighter-rouge">ReLU</code> i <code class="language-plaintext highlighter-rouge">SoftmaxCrossEntropyWithLogits</code>.
+Podsjetimo se, gubitak unakrsne entropije računa udaljenost između
+točne distribucije i distribucije koju predviđa model i definiran je kao:</p>
+
+\[L = - \sum_{j=1}^{C} y_j \log(p_j(\mathbf{x})) \; .\\\]
+
+<p>U prikazanoj jednadžbi C predstavlja broj razreda,
+a \( \mathbf{x} \) ulaz funkcije softmaks
+kojeg možemo zvati klasifikacijska mjera ili logit.
+Vektor \( \mathbf{y} \) sadrži točnu distribuciju
+preko svih razreda za dani primjer.
+Tu distribuciju najčešće zadajemo
+jednojediničnim (eng. one-hot) vektorom.
+Skalar \( p_j = \text{softmax}_j(\mathbf{x}) \) predstavlja
+izlaz funkcije softmax za razred \(j\).
+Radi jednostavnosti, jednadžba prikazuje
+gubitak za samo jedan primjer,
+dok ćemo u praksi obično razmatrati
+prosječan gubitak preko svih primjera mini-grupe.
+Da biste izveli unatražni prolazak kroz sloj potrebno je najprije izračunati
+gradijent gubitka s obzirom na logite \( \frac{∂L}{∂\mathbf{x}} \).
+Izvod možemo pojednostavniti tako da
+unaprijed raspišemo funkciju softmax:</p>
+
+\[\log(\text{softmax}_j(x))
+  = \log \left(
+    \frac{e^{x_j}}{\sum_{k=1}^{C} e^{x_k}}
+   \right)
+  = x_j - \log \sum_{k=1}^{C} e^{x_k}
+\\
+L
+  = - \sum_{j=1}^{C} y_j
+   \left(
+    x_j - \log \sum_{k=1}^{C} e^{x_k}\right)
+  = - \sum_{j=1}^{C} y_j x_j +
+    \log \left(
+      \sum_{k=1}^{C} e^{x_k}
+     \right)
+    \sum_{j=1}^{C} y_j \;\; ;
+    \;\;\;\;
+    \sum_{j=1}^{C} y_j = 1
+\\
+L =
+ \log \left(
+  \sum_{k=1}^{C} e^{x_k}
+ \right)
+ - \sum_{j=1}^{C} y_j x_j \\\]
+
+<p>Sada možemo jednostavno izračunati derivaciju
+funkcije cilja s obzirom na k-ti logit \( x_k \):</p>
+
+\[\frac{∂L}{∂x_l} =
+    \frac{∂}{∂x_l}
+    \log \left(
+     \sum_{k=1}^{C} e^{x_k}
+    \right)
+    -
+    \frac{∂}{∂x_l} \sum_{j=1}^{C} y_j x_j
+  \\
+  \frac{∂}{∂x_l}
+    log \left(
+     \sum_{k=1}^{C} e^{x_k}
+    \right)
+    = \frac{1}{
+       \sum_{k=1}^{C} e^{x_k}} \cdot e^{x_l}
+    = \text{softmax}_l(\mathbf{x})
+  \\
+  \frac{∂L}{∂x_l}
+    = \text{softmax}_l(\mathbf{x}) - y_l \\\]
+
+<p>Konačno, gradijent s obzirom na sve logite
+dobivamo kao vektorsku razliku između<br />
+predikcije modela i točne distribucije:</p>
+
+\[\frac{∂L}{∂\mathbf{x}} = \text{softmax}(\mathbf{x}) - \mathbf{y} \\\]
+
+<p>Kako biste bili sigurni da ste ispravno napisali sve slojeve
+testirajte gradijente pozivom skripte <code class="language-plaintext highlighter-rouge">check_grads.py</code>.
+Zadovoljavajuća relativna greška bi trebala biti manja od \(10^{-5}\)
+ako vaši tenzori imaju dvostruku preciznost.
+Proučite izvorni kod te skripte jer će vam
+ta funkcionalnost biti vrlo korisna za treću vježbu.
+Razmislite zašto pri učenju dubokih modela radije koristimo
+analitičke nego numeričke gradijente.</p>
+
+<p>Sada prevedite Cython modul <code class="language-plaintext highlighter-rouge">im2col_cython.pyx</code>
+pozivom <code class="language-plaintext highlighter-rouge">python3 setup_cython.py build_ext --inplace</code>
+te po potrebi izmijenite varijable <code class="language-plaintext highlighter-rouge">DATA_DIR</code> i <code class="language-plaintext highlighter-rouge">SAVE_DIR</code>.
+Proučite izvorni kod funkcija <code class="language-plaintext highlighter-rouge">col2im_cython</code> i <code class="language-plaintext highlighter-rouge">im2col_cython</code>
+te istražite kako se te funkcije koriste.</p>
+
+<p>Proučite i skicirajte model zadan objektom <code class="language-plaintext highlighter-rouge">net</code> u skripti <code class="language-plaintext highlighter-rouge">train.py</code>.
+Odredite veličine tenzora te broj parametara u svakom sloju.
+Odredite veličinu receptivnog polja značajki
+iz posljednjeg (drugog) konvolucijskog sloja.
+Procijenite ukupnu količinu memorije za pohranjivanje aktivacija
+koje su potrebne za provođenje backpropa
+ako učimo s mini-grupama od 50 slika.</p>
+
+<p>Napokon, pokrenite učenje modela pozivom skripte <code class="language-plaintext highlighter-rouge">train.py</code>.
+Odredite vezu između početnog iznosa funkcije gubitka i broja razreda C.
+Tijekom učenja možete promatrati vizualizaciju filtara
+koji se spremaju u kazalo <code class="language-plaintext highlighter-rouge">SAVE_DIR</code>.
+Budući da svaka težina odgovara jednom pikselu slike,
+u vašem pregledniku isključite automatsko glađenje slike.
+Preporuka je da na Linuxu koristite preglednik Geeqie.</p>
+
+<p><a name="2zad"></a></p>
+
+<h3 id="2-zadatak-25">2. zadatak (25%)</h3>
+
+<p>U ovom zadatku trebate dodati podršku za
+L2 regularizaciju parametara.
+Dovršite implementaciju sloja <code class="language-plaintext highlighter-rouge">L2Regularizer</code>
+te naučite regularizirani model iz
+prethodnog zadatka koji se nalazi u <code class="language-plaintext highlighter-rouge">train_l2reg.py</code>.
+Proučite efekte regularizacijskog hiper-parametra
+tako da naučite tri različita modela s
+\( \lambda = 1e^{-3}, \lambda=1e^{-2}, \lambda=1e^{-1} \)
+te usporedite naučene filtre u prvom sloju i dobivenu točnost.</p>
+
+<!---
+Minimalno je potrebno izmijeniti update\_params metode.
+Dodajte novi sloj L2Loss koji na ulazu forward metode prima tenzor težine te
+implementirajte odgovarajući unaprijedni i unazadni prolazak.
+Dodajte novi sloj MultiLoss koji na ulaz prima listu funkcija cilja te računa njihov zbroj.
+Konačna funkcija cilja je sada MultiLoss koji u našem slučaju na ulazu treba dobiti
+listu u kojoj se nalazi funkcija cilja unakrsne entropije i L2 regularizacije težina
+konvolucijskih i potpuno povezanih slojeva.
+-->
+
+<div class="fig figcenter fighighlight">
+  <img src="./figures/filters1_big.png" width="80%" />
+  <img src="./figures/filters2_big.png" width="80%" />
+  <div class="figcaption">Slučajno inicijalizirani filtri u prvom sloju na početku učenja (iznad) i naučeni filtri (ispod) s regularizacijom lambda = 0.01.</div>
+</div>
+
+<p><a name="3zad"></a></p>
+
+<h3 id="3-zadatak---usporedba-s-pytorchem-25">3. zadatak - usporedba s PyTorchem (25%)</h3>
+<p>U PyTorchu definirajte i naučite model koji je ekvivalentan regulariziranom modelu iz 2. zadatka.
+Koristite identičnu arhitekturu i parametre učenja da biste reproducirali rezultate.
+Konvoluciju zadajte operacijama <a href="https://pytorch.org/docs/stable/nn.html#torch.nn.Conv2d"><code class="language-plaintext highlighter-rouge">torch.nn.Conv2d</code></a>
+ili <a href="https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.conv2d"><code class="language-plaintext highlighter-rouge">torch.nn.functional.conv2d</code></a>.
+U nastavku teksta navodimo primjer korištenja konvolucije razredom <code class="language-plaintext highlighter-rouge">torch.nn.Conv2d</code>.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">nn</span>
+
+<span class="k">class</span> <span class="nc">CovolutionalModel</span><span class="p">(</span><span class="n">nn</span><span class="p">.</span><span class="n">Module</span><span class="p">):</span>
+  <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">in_channels</span><span class="p">,</span> <span class="n">conv1_width</span><span class="p">,</span> <span class="p">...,</span> <span class="n">fc1_width</span><span class="p">,</span> <span class="n">class_count</span><span class="p">):</span>
+    <span class="bp">self</span><span class="p">.</span><span class="n">conv1</span> <span class="o">=</span> <span class="n">nn</span><span class="p">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="n">in_channels</span><span class="p">,</span> <span class="n">conv1_width</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="c1"># ostatak konvolucijskih slojeva i slojeva sažimanja
+</span>    <span class="p">...</span>
+    <span class="c1"># potpuno povezani slojevi
+</span>    <span class="bp">self</span><span class="p">.</span><span class="n">fc1</span> <span class="o">=</span> <span class="n">nn</span><span class="p">.</span><span class="n">Linear</span><span class="p">(...,</span> <span class="n">fc1_width</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="bp">self</span><span class="p">.</span><span class="n">fc_logits</span> <span class="o">=</span> <span class="n">nn</span><span class="p">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">fc1_width</span><span class="p">,</span> <span class="n">class_count</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+    <span class="c1"># parametri su već inicijalizirani pozivima Conv2d i Linear
+</span>    <span class="c1"># ali možemo ih drugačije inicijalizirati
+</span>    <span class="bp">self</span><span class="p">.</span><span class="n">reset_parameters</span><span class="p">()</span>
+
+  <span class="k">def</span> <span class="nf">reset_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">modules</span><span class="p">():</span>
+      <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">nn</span><span class="p">.</span><span class="n">Conv2d</span><span class="p">):</span>
+        <span class="n">nn</span><span class="p">.</span><span class="n">init</span><span class="p">.</span><span class="n">kaiming_normal_</span><span class="p">(</span><span class="n">m</span><span class="p">.</span><span class="n">weight</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">'fan_in'</span><span class="p">,</span> <span class="n">nonlinearity</span><span class="o">=</span><span class="s">'relu'</span><span class="p">)</span>
+        <span class="n">nn</span><span class="p">.</span><span class="n">init</span><span class="p">.</span><span class="n">constant_</span><span class="p">(</span><span class="n">m</span><span class="p">.</span><span class="n">bias</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+      <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">nn</span><span class="p">.</span><span class="n">Linear</span><span class="p">)</span> <span class="ow">and</span> <span class="n">m</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">self</span><span class="p">.</span><span class="n">fc_logits</span><span class="p">:</span>
+        <span class="n">nn</span><span class="p">.</span><span class="n">init</span><span class="p">.</span><span class="n">kaiming_normal_</span><span class="p">(</span><span class="n">m</span><span class="p">.</span><span class="n">weight</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">'fan_in'</span><span class="p">,</span> <span class="n">nonlinearity</span><span class="o">=</span><span class="s">'relu'</span><span class="p">)</span>
+        <span class="n">nn</span><span class="p">.</span><span class="n">init</span><span class="p">.</span><span class="n">constant_</span><span class="p">(</span><span class="n">m</span><span class="p">.</span><span class="n">bias</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="bp">self</span><span class="p">.</span><span class="n">fc_logits</span><span class="p">.</span><span class="n">reset_parameters</span><span class="p">()</span>
+
+  <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">conv1</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="p">...</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">torch</span><span class="p">.</span><span class="n">relu</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>  <span class="c1"># može i h.relu() ili nn.functional.relu(h)
+</span>    <span class="p">...</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">h</span><span class="p">.</span><span class="n">view</span><span class="p">(</span><span class="n">h</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">fc1</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">torch</span><span class="p">.</span><span class="n">relu</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+    <span class="n">logits</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">fc_logits</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">logits</span>
+
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+
+<p>Ako želite koristiti <code class="language-plaintext highlighter-rouge">torch.nn.functional.conv2d</code>, vodite računa o ručnom definiranju parametara
+tipa <a href="https://pytorch.org/docs/stable/nn.html#torch.nn.Parameter"><code class="language-plaintext highlighter-rouge">torch.nn.Parameter</code></a>.
+Pritom se poslužite slijedećim <a href="https://pytorch.org/docs/stable/notes/extending.html#adding-a-module">primjerom</a>.
+Vodite računa o odgovarajućoj dimenzionalnosti tenzora konvolucijskih jezgara te tenzora pomaka.</p>
+
+<p>Tijekom učenja vizualizirajte filtre u prvom sloju kao u prethodnoj vježbi.
+Nakon svake epohe učenja pohranite filtre i gubitak u datoteku (ili koristite <a href="https://pytorch.org/docs/stable/tensorboard.html">Tensorboard</a>).</p>
+
+<p>Na kraju učenja prikažite kretanje gubitka kroz epohe (Matplotlib).</p>
+
+<p>Za razliku od 1. vježbe, ovdje za iteriranje i uzorkovanje mini-grupa
+preporučamo koristiti <code class="language-plaintext highlighter-rouge">torch.utils.data.DataLoader</code>
+prema sljedećoj <a href="https://pytorch.org/docs/stable/data.html">dokumentaciji</a>.</p>
+
+<p><a name="4zad"></a></p>
+<h3 id="4-zadatak---klasifikacija-na-skupu-cifar-10-25">4. zadatak - Klasifikacija na skupu CIFAR-10 (25%)</h3>
+<p>Skup podataka <a href="https://www.cs.toronto.edu/~kriz/cifar.html">CIFAR-10</a> sastoji se od 50000 slika za učenje i validaciju te 10000 slika za
+testiranje dimenzija 32x32 podijeljenih u 10 razreda.
+Najprije skinite dataset pripremljen za Python <a href="https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz">odavde</a> ili korištenjem <a href="https://pytorch.org/docs/stable/torchvision/datasets.html#cifar"><code class="language-plaintext highlighter-rouge">torchvision.datasets.CIFAR10</code></a>.
+Možete iskoristiti sljedeći kod kako biste učitali podatke i pripremili ih.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">pickle</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="n">np</span>
+
+<span class="k">def</span> <span class="nf">shuffle_data</span><span class="p">(</span><span class="n">data_x</span><span class="p">,</span> <span class="n">data_y</span><span class="p">):</span>
+  <span class="n">indices</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">arange</span><span class="p">(</span><span class="n">data_x</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+  <span class="n">np</span><span class="p">.</span><span class="n">random</span><span class="p">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span>
+  <span class="n">shuffled_data_x</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">data_x</span><span class="p">[</span><span class="n">indices</span><span class="p">])</span>
+  <span class="n">shuffled_data_y</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">data_y</span><span class="p">[</span><span class="n">indices</span><span class="p">])</span>
+  <span class="k">return</span> <span class="n">shuffled_data_x</span><span class="p">,</span> <span class="n">shuffled_data_y</span>
+
+<span class="k">def</span> <span class="nf">unpickle</span><span class="p">(</span><span class="nb">file</span><span class="p">):</span>
+  <span class="n">fo</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="nb">file</span><span class="p">,</span> <span class="s">'rb'</span><span class="p">)</span>
+  <span class="nb">dict</span> <span class="o">=</span> <span class="n">pickle</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">fo</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s">'latin1'</span><span class="p">)</span>
+  <span class="n">fo</span><span class="p">.</span><span class="n">close</span><span class="p">()</span>
+  <span class="k">return</span> <span class="nb">dict</span>
+
+<span class="n">DATA_DIR</span> <span class="o">=</span> <span class="s">'/path/to/data/'</span>
+
+<span class="n">img_height</span> <span class="o">=</span> <span class="mi">32</span>
+<span class="n">img_width</span> <span class="o">=</span> <span class="mi">32</span>
+<span class="n">num_channels</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">num_classes</span> <span class="o">=</span> <span class="mi">10</span>
+
+<span class="n">train_x</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">ndarray</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="n">img_height</span> <span class="o">*</span> <span class="n">img_width</span> <span class="o">*</span> <span class="n">num_channels</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="p">.</span><span class="n">float32</span><span class="p">)</span>
+<span class="n">train_y</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">6</span><span class="p">):</span>
+  <span class="n">subset</span> <span class="o">=</span> <span class="n">unpickle</span><span class="p">(</span><span class="n">os</span><span class="p">.</span><span class="n">path</span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">DATA_DIR</span><span class="p">,</span> <span class="s">'data_batch_%d'</span> <span class="o">%</span> <span class="n">i</span><span class="p">))</span>
+  <span class="n">train_x</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">train_x</span><span class="p">,</span> <span class="n">subset</span><span class="p">[</span><span class="s">'data'</span><span class="p">]))</span>
+  <span class="n">train_y</span> <span class="o">+=</span> <span class="n">subset</span><span class="p">[</span><span class="s">'labels'</span><span class="p">]</span>
+<span class="n">train_x</span> <span class="o">=</span> <span class="n">train_x</span><span class="p">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_channels</span><span class="p">,</span> <span class="n">img_height</span><span class="p">,</span> <span class="n">img_width</span><span class="p">)).</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">train_y</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">array</span><span class="p">(</span><span class="n">train_y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="p">.</span><span class="n">int32</span><span class="p">)</span>
+
+<span class="n">subset</span> <span class="o">=</span> <span class="n">unpickle</span><span class="p">(</span><span class="n">os</span><span class="p">.</span><span class="n">path</span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">DATA_DIR</span><span class="p">,</span> <span class="s">'test_batch'</span><span class="p">))</span>
+<span class="n">test_x</span> <span class="o">=</span> <span class="n">subset</span><span class="p">[</span><span class="s">'data'</span><span class="p">].</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_channels</span><span class="p">,</span> <span class="n">img_height</span><span class="p">,</span> <span class="n">img_width</span><span class="p">)).</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">).</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="n">float32</span><span class="p">)</span>
+<span class="n">test_y</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">array</span><span class="p">(</span><span class="n">subset</span><span class="p">[</span><span class="s">'labels'</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="p">.</span><span class="n">int32</span><span class="p">)</span>
+
+<span class="n">valid_size</span> <span class="o">=</span> <span class="mi">5000</span>
+<span class="n">train_x</span><span class="p">,</span> <span class="n">train_y</span> <span class="o">=</span> <span class="n">shuffle_data</span><span class="p">(</span><span class="n">train_x</span><span class="p">,</span> <span class="n">train_y</span><span class="p">)</span>
+<span class="n">valid_x</span> <span class="o">=</span> <span class="n">train_x</span><span class="p">[:</span><span class="n">valid_size</span><span class="p">,</span> <span class="p">...]</span>
+<span class="n">valid_y</span> <span class="o">=</span> <span class="n">train_y</span><span class="p">[:</span><span class="n">valid_size</span><span class="p">,</span> <span class="p">...]</span>
+<span class="n">train_x</span> <span class="o">=</span> <span class="n">train_x</span><span class="p">[</span><span class="n">valid_size</span><span class="p">:,</span> <span class="p">...]</span>
+<span class="n">train_y</span> <span class="o">=</span> <span class="n">train_y</span><span class="p">[</span><span class="n">valid_size</span><span class="p">:,</span> <span class="p">...]</span>
+<span class="n">data_mean</span> <span class="o">=</span> <span class="n">train_x</span><span class="p">.</span><span class="n">mean</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+<span class="n">data_std</span> <span class="o">=</span> <span class="n">train_x</span><span class="p">.</span><span class="n">std</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+
+<span class="n">train_x</span> <span class="o">=</span> <span class="p">(</span><span class="n">train_x</span> <span class="o">-</span> <span class="n">data_mean</span><span class="p">)</span> <span class="o">/</span> <span class="n">data_std</span>
+<span class="n">valid_x</span> <span class="o">=</span> <span class="p">(</span><span class="n">valid_x</span> <span class="o">-</span> <span class="n">data_mean</span><span class="p">)</span> <span class="o">/</span> <span class="n">data_std</span>
+<span class="n">test_x</span> <span class="o">=</span> <span class="p">(</span><span class="n">test_x</span> <span class="o">-</span> <span class="n">data_mean</span><span class="p">)</span> <span class="o">/</span> <span class="n">data_std</span>
+
+<span class="n">train_x</span> <span class="o">=</span> <span class="n">train_x</span><span class="p">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="n">valid_x</span> <span class="o">=</span> <span class="n">valid_x</span><span class="p">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="n">test_x</span> <span class="o">=</span> <span class="n">test_x</span><span class="p">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+
+<p>Vaš zadatak je da u PyTorchu naučite konvolucijski model na ovom skupu.
+U nastavku je prijedlog jednostavnog modela
+s kojom biste trebali dobiti ukupnu točnost oko 70% na validacijskom skupu:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>conv(16,5) -&gt; relu() -&gt; pool(3,2) -&gt; conv(32,5) -&gt; relu() -&gt; pool(3,2) -&gt; fc(256) -&gt; relu() -&gt; fc(128) -&gt; relu() -&gt; fc(10)
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+<p>gdje <code class="language-plaintext highlighter-rouge">conv(16,5)</code> predstavlja konvoluciju sa 16 mapa te dimenzijom filtra 5x5,
+a <code class="language-plaintext highlighter-rouge">pool(3,2)</code> max-pooling sloj s oknom veličine 3x3 i pomakom (<em>stride</em>) 2.
+Prilikom treniranja padajuću stopu učenja možete implementirati korištenjem
+<code class="language-plaintext highlighter-rouge">torch.optim.lr_scheduler.ExponentialLR</code>.</p>
+
+<p>Napišite funkciju <code class="language-plaintext highlighter-rouge">evaluate</code> koja na temelju predviđenih i točnih indeksa razreda određuje pokazatelje klasifikacijske performanse:
+ukupnu točnost klasifikacije, matricu zabune (engl. confusion matrix) u kojoj retci odgovaraju točnim razredima a stupci predikcijama te mjere preciznosti
+i odziva pojedinih razreda. U implementaciji prvo izračunajte matricu zabune, a onda sve ostale pokazatelje na temelju nje.
+Tijekom učenja pozivajte funkciju <code class="language-plaintext highlighter-rouge">evaluate</code> nakon svake epohe na skupu za učenje i
+validacijskom skupu te na grafu pratite sljedeće vrijednosti: prosječnu vrijednost
+funkcije gubitka, stopu učenja te ukupnu točnost klasifikacije.
+Preporuka je da funkciji provedete samo
+unaprijedni prolaz kroz dane primjere koristeći <code class="language-plaintext highlighter-rouge">torch.no_grad()</code> i pritom izračunati matricu zabune.
+Pazite da slučajno ne pozovete i operaciju koja provodi učenje tijekom evaluacije.
+Na kraju funkcije možete izračunati ostale pokazatelje te ih isprintati.</p>
+
+<div class="fig figcenter fighighlight">
+  <img src="./figures/training_plot.png" width="100%" />
+  <div class="figcaption figcenter">Primjer grafa učenja za navedeni model uz veličinu grupe od 50</div>
+</div>
+
+<p>Vizualizirajte slučajno inicijalizirane
+težine konvolucijskog sloja možeze dohvatiti
+korištenjem
+<code class="language-plaintext highlighter-rouge">conv.weight</code>.
+U nastavku je primjer kako to može izgledati, ovisno
+o načinu implementacije konvolucijske mreže.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">net</span> <span class="o">=</span> <span class="n">ConvNet</span><span class="p">()</span>
+
+<span class="n">draw_conv_filters</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">net</span><span class="p">.</span><span class="n">conv1</span><span class="p">.</span><span class="n">weight</span><span class="p">.</span><span class="n">detach</span><span class="p">().</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">SAVE_DIR</span><span class="p">)</span>
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+
+<p>U nastavku se nalazi kod koji možete
+koristiti za vizualizaciju:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">draw_conv_filters</span><span class="p">(</span><span class="n">epoch</span><span class="p">,</span> <span class="n">step</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">save_dir</span><span class="p">):</span>
+  <span class="n">w</span> <span class="o">=</span> <span class="n">weights</span><span class="p">.</span><span class="n">copy</span><span class="p">()</span>
+  <span class="n">num_filters</span> <span class="o">=</span> <span class="n">w</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+  <span class="n">num_channels</span> <span class="o">=</span> <span class="n">w</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+  <span class="n">k</span> <span class="o">=</span> <span class="n">w</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+  <span class="k">assert</span> <span class="n">w</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">==</span> <span class="n">w</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+  <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="p">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+  <span class="n">w</span> <span class="o">-=</span> <span class="n">w</span><span class="p">.</span><span class="nb">min</span><span class="p">()</span>
+  <span class="n">w</span> <span class="o">/=</span> <span class="n">w</span><span class="p">.</span><span class="nb">max</span><span class="p">()</span>
+  <span class="n">border</span> <span class="o">=</span> <span class="mi">1</span>
+  <span class="n">cols</span> <span class="o">=</span> <span class="mi">8</span>
+  <span class="n">rows</span> <span class="o">=</span> <span class="n">math</span><span class="p">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">num_filters</span> <span class="o">/</span> <span class="n">cols</span><span class="p">)</span>
+  <span class="n">width</span> <span class="o">=</span> <span class="n">cols</span> <span class="o">*</span> <span class="n">k</span> <span class="o">+</span> <span class="p">(</span><span class="n">cols</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">border</span>
+  <span class="n">height</span> <span class="o">=</span> <span class="n">rows</span> <span class="o">*</span> <span class="n">k</span> <span class="o">+</span> <span class="p">(</span><span class="n">rows</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">border</span>
+  <span class="n">img</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">num_channels</span><span class="p">])</span>
+  <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_filters</span><span class="p">):</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">i</span> <span class="o">/</span> <span class="n">cols</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">k</span> <span class="o">+</span> <span class="n">border</span><span class="p">)</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">i</span> <span class="o">%</span> <span class="n">cols</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">k</span> <span class="o">+</span> <span class="n">border</span><span class="p">)</span>
+    <span class="n">img</span><span class="p">[</span><span class="n">r</span><span class="p">:</span><span class="n">r</span><span class="o">+</span><span class="n">k</span><span class="p">,</span><span class="n">c</span><span class="p">:</span><span class="n">c</span><span class="o">+</span><span class="n">k</span><span class="p">,:]</span> <span class="o">=</span> <span class="n">w</span><span class="p">[:,:,:,</span><span class="n">i</span><span class="p">]</span>
+  <span class="n">filename</span> <span class="o">=</span> <span class="s">'epoch_%02d_step_%06d.png'</span> <span class="o">%</span> <span class="p">(</span><span class="n">epoch</span><span class="p">,</span> <span class="n">step</span><span class="p">)</span>
+  <span class="n">ski</span><span class="p">.</span><span class="n">io</span><span class="p">.</span><span class="n">imsave</span><span class="p">(</span><span class="n">os</span><span class="p">.</span><span class="n">path</span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">save_dir</span><span class="p">,</span> <span class="n">filename</span><span class="p">),</span> <span class="n">img</span><span class="p">)</span>
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+
+<div class="fig figcenter fighighlight">
+  <img src="./figures/cifar_filters1.png" width="80%" />
+  <img src="./figures/cifar_filters2.png" width="80%" />
+  <div class="figcaption figcenter">CIFAR-10: slučajno inicijalizirani filtri u prvom sloju na početku učenja (iznad) i naučeni filtri (ispod) s regularizacijom lambda = 0.0001.</div>
+</div>
+
+<p>Prikažite 20 netočno klasificiranih slika s najvećim gubitkom te ispišite njihov točan razred,
+kao i 3 razreda za koje je model dao najveću vjerojatnost.
+Da biste prikazali sliku, morate najprije poništiti normalizaciju srednje vrijednosti i
+varijance:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">skimage</span> <span class="k">as</span> <span class="n">ski</span>
+<span class="kn">import</span> <span class="nn">skimage.io</span>
+
+<span class="k">def</span> <span class="nf">draw_image</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">mean</span><span class="p">,</span> <span class="n">std</span><span class="p">):</span>
+  <span class="n">img</span> <span class="o">=</span> <span class="n">img</span><span class="p">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+  <span class="n">img</span> <span class="o">*=</span> <span class="n">std</span>
+  <span class="n">img</span> <span class="o">+=</span> <span class="n">mean</span>
+  <span class="n">img</span> <span class="o">=</span> <span class="n">img</span><span class="p">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="n">uint8</span><span class="p">)</span>
+  <span class="n">ski</span><span class="p">.</span><span class="n">io</span><span class="p">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">img</span><span class="p">)</span>
+  <span class="n">ski</span><span class="p">.</span><span class="n">io</span><span class="p">.</span><span class="n">show</span><span class="p">()</span>
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+
+<p>Ispod se nalazi kod koji možete iskoristiti za crtanje grafova:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">plot_training_progress</span><span class="p">(</span><span class="n">save_dir</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+  <span class="n">fig</span><span class="p">,</span> <span class="p">((</span><span class="n">ax1</span><span class="p">,</span> <span class="n">ax2</span><span class="p">),</span> <span class="p">(</span><span class="n">ax3</span><span class="p">,</span> <span class="n">ax4</span><span class="p">))</span> <span class="o">=</span> <span class="n">plt</span><span class="p">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span><span class="mi">8</span><span class="p">))</span>
+
+  <span class="n">linewidth</span> <span class="o">=</span> <span class="mi">2</span>
+  <span class="n">legend_size</span> <span class="o">=</span> <span class="mi">10</span>
+  <span class="n">train_color</span> <span class="o">=</span> <span class="s">'m'</span>
+  <span class="n">val_color</span> <span class="o">=</span> <span class="s">'c'</span>
+
+  <span class="n">num_points</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s">'train_loss'</span><span class="p">])</span>
+  <span class="n">x_data</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_points</span><span class="p">,</span> <span class="n">num_points</span><span class="p">)</span>
+  <span class="n">ax1</span><span class="p">.</span><span class="n">set_title</span><span class="p">(</span><span class="s">'Cross-entropy loss'</span><span class="p">)</span>
+  <span class="n">ax1</span><span class="p">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_data</span><span class="p">,</span> <span class="n">data</span><span class="p">[</span><span class="s">'train_loss'</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s">'o'</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">train_color</span><span class="p">,</span>
+           <span class="n">linewidth</span><span class="o">=</span><span class="n">linewidth</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s">'-'</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s">'train'</span><span class="p">)</span>
+  <span class="n">ax1</span><span class="p">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_data</span><span class="p">,</span> <span class="n">data</span><span class="p">[</span><span class="s">'valid_loss'</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s">'o'</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">val_color</span><span class="p">,</span>
+           <span class="n">linewidth</span><span class="o">=</span><span class="n">linewidth</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s">'-'</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s">'validation'</span><span class="p">)</span>
+  <span class="n">ax1</span><span class="p">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s">'upper right'</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="n">legend_size</span><span class="p">)</span>
+  <span class="n">ax2</span><span class="p">.</span><span class="n">set_title</span><span class="p">(</span><span class="s">'Average class accuracy'</span><span class="p">)</span>
+  <span class="n">ax2</span><span class="p">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_data</span><span class="p">,</span> <span class="n">data</span><span class="p">[</span><span class="s">'train_acc'</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s">'o'</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">train_color</span><span class="p">,</span>
+           <span class="n">linewidth</span><span class="o">=</span><span class="n">linewidth</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s">'-'</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s">'train'</span><span class="p">)</span>
+  <span class="n">ax2</span><span class="p">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_data</span><span class="p">,</span> <span class="n">data</span><span class="p">[</span><span class="s">'valid_acc'</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s">'o'</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">val_color</span><span class="p">,</span>
+           <span class="n">linewidth</span><span class="o">=</span><span class="n">linewidth</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s">'-'</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s">'validation'</span><span class="p">)</span>
+  <span class="n">ax2</span><span class="p">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s">'upper left'</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="n">legend_size</span><span class="p">)</span>
+  <span class="n">ax3</span><span class="p">.</span><span class="n">set_title</span><span class="p">(</span><span class="s">'Learning rate'</span><span class="p">)</span>
+  <span class="n">ax3</span><span class="p">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_data</span><span class="p">,</span> <span class="n">data</span><span class="p">[</span><span class="s">'lr'</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s">'o'</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">train_color</span><span class="p">,</span>
+           <span class="n">linewidth</span><span class="o">=</span><span class="n">linewidth</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s">'-'</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s">'learning_rate'</span><span class="p">)</span>
+  <span class="n">ax3</span><span class="p">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s">'upper left'</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="n">legend_size</span><span class="p">)</span>
+
+  <span class="n">save_path</span> <span class="o">=</span> <span class="n">os</span><span class="p">.</span><span class="n">path</span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">save_dir</span><span class="p">,</span> <span class="s">'training_plot.png'</span><span class="p">)</span>
+  <span class="k">print</span><span class="p">(</span><span class="s">'Plotting in: '</span><span class="p">,</span> <span class="n">save_path</span><span class="p">)</span>
+  <span class="n">plt</span><span class="p">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">save_path</span><span class="p">)</span>
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">plot_data</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">plot_data</span><span class="p">[</span><span class="s">'train_loss'</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">plot_data</span><span class="p">[</span><span class="s">'valid_loss'</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">plot_data</span><span class="p">[</span><span class="s">'train_acc'</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">plot_data</span><span class="p">[</span><span class="s">'valid_acc'</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">plot_data</span><span class="p">[</span><span class="s">'lr'</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_epochs</span><span class="p">):</span>
+    <span class="n">X</span><span class="p">,</span> <span class="n">Yoh</span> <span class="o">=</span> <span class="n">shuffle_data</span><span class="p">(</span><span class="n">train_x</span><span class="p">,</span> <span class="n">train_labels</span><span class="p">)</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">torch</span><span class="p">.</span><span class="n">FloatTensor</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+    <span class="n">Yoh</span> <span class="o">=</span> <span class="n">torch</span><span class="p">.</span><span class="n">FloatTensor</span><span class="p">(</span><span class="n">Yoh</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_batch</span><span class="p">):</span>
+        <span class="c1"># broj primjera djeljiv s veličinom grupe bsz
+</span>        <span class="n">batch_X</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">batch</span><span class="o">*</span><span class="n">bsz</span><span class="p">:(</span><span class="n">batch</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">bsz</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">batch_Yoh</span> <span class="o">=</span> <span class="n">Yoh</span><span class="p">[</span><span class="n">batch</span><span class="o">*</span><span class="n">bsz</span><span class="p">:(</span><span class="n">batch</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">bsz</span><span class="p">,</span> <span class="p">:]</span>
+
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">model</span><span class="p">.</span><span class="n">get_loss</span><span class="p">(</span><span class="n">batch_X</span><span class="p">,</span> <span class="n">batch_Yoh</span><span class="p">)</span>
+        <span class="n">loss</span><span class="p">.</span><span class="n">backward</span><span class="p">()</span>
+        <span class="n">optimizer</span><span class="p">.</span><span class="n">step</span><span class="p">()</span>
+        <span class="n">optimizer</span><span class="p">.</span><span class="n">zero_grad</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">batch</span><span class="o">%</span><span class="mi">100</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">"epoch: {}, step: {}/{}, batch_loss: {}"</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="n">epoch</span><span class="p">,</span> <span class="n">batch</span><span class="p">,</span> <span class="n">n_batch</span><span class="p">,</span> <span class="n">loss</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">batch</span><span class="o">%</span><span class="mi">200</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">draw_conv_filters</span><span class="p">(</span><span class="n">epoch</span><span class="p">,</span> <span class="n">batch</span><span class="p">,</span> <span class="n">model</span><span class="p">.</span><span class="n">conv1</span><span class="p">.</span><span class="n">weight</span><span class="p">.</span><span class="n">detach</span><span class="p">().</span><span class="n">cpu</span><span class="p">().</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">SAVE_DIR</span><span class="p">)</span>
+
+
+    <span class="n">train_loss</span><span class="p">,</span> <span class="n">train_acc</span> <span class="o">=</span> <span class="n">evaluate</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">train_x</span><span class="p">,</span> <span class="n">train_labels</span><span class="p">)</span>
+    <span class="n">val_loss</span><span class="p">,</span> <span class="n">val_acc</span> <span class="o">=</span> <span class="n">evaluate</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">valid_x</span><span class="p">,</span> <span class="n">valid_labels</span><span class="p">)</span>
+
+    <span class="n">plot_data</span><span class="p">[</span><span class="s">'train_loss'</span><span class="p">]</span> <span class="o">+=</span> <span class="p">[</span><span class="n">train_loss</span><span class="p">]</span>
+    <span class="n">plot_data</span><span class="p">[</span><span class="s">'valid_loss'</span><span class="p">]</span> <span class="o">+=</span> <span class="p">[</span><span class="n">val_loss</span><span class="p">]</span>
+    <span class="n">plot_data</span><span class="p">[</span><span class="s">'train_acc'</span><span class="p">]</span> <span class="o">+=</span> <span class="p">[</span><span class="n">train_acc</span><span class="p">]</span>
+    <span class="n">plot_data</span><span class="p">[</span><span class="s">'valid_acc'</span><span class="p">]</span> <span class="o">+=</span> <span class="p">[</span><span class="n">val_acc</span><span class="p">]</span>
+    <span class="n">plot_data</span><span class="p">[</span><span class="s">'lr'</span><span class="p">]</span> <span class="o">+=</span> <span class="p">[</span><span class="n">lr_scheduler</span><span class="p">.</span><span class="n">get_lr</span><span class="p">()]</span>
+    <span class="n">lr_scheduler</span><span class="p">.</span><span class="n">step</span><span class="p">()</span>
+
+<span class="n">plot_training_progress</span><span class="p">(</span><span class="n">SAVE_DIR</span><span class="p">,</span> <span class="n">plot_data</span><span class="p">)</span>
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+
+<p>Ukoliko imate GPU, možda će vam biti zanimljivo pokušati dobiti bolje rezultate s moćnijom
+arhitekturom. U tom slučaju <a href="http://rodrigob.github.io/are_we_there_yet/build/classification_datasets_results.html#43494641522d3130">ovdje</a>
+možete pronaći pregled članaka koji imaju najbolje rezultate na ovom skupu.
+Kao što vidite trenutni <em>state of the art</em> je oko 96% ukupne točnosti.
+Dva važna trika koje koriste najbolje arhitekture su skaliranje slika na veću rezoluciju
+kako bi omogućili da prvi konvolucijski slojevi uče značajke jako niske razine
+te proširivanje skupa za učenje raznim modificiranjem slika (<em>data jittering</em>).
+Bez ovih trikova je jako teško preći preko 90% ukupne točnosti.</p>
+
+<h3 id="bonus-zadatak---multiclass-hinge-loss-max-20">Bonus zadatak - Multiclass hinge loss (max 20%)</h3>
+
+<p>Ovaj zadatak razmatra učenje modela za slike iz CIFARA
+s alternativnom formulacijom gubitka
+koju nismo obradili na predavanjima.
+Cilj je zamijeniti unakrsnu entropiju
+višerazrednom inačicom gubitka zglobnice.
+Objašnjenje tog gubitka možete pronaći
+<a href="http://cs231n.github.io/linear-classify/#svm">ovdje</a>.
+Za sve bodove zadatak je potrebno riješiti
+primjenom osnovnih PyTorch operacija nad tenzorima
+te usporediti postignute rezultate.</p>
+
+<p>Pomoć: sučelje nove funkcije gubitka
+moglo bi izgledati ovako:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>def multiclass_hinge_loss(logits: torch.Tensor, target: torch.Tensor, delta=1.):
+    """
+        Args:
+            logits: torch.Tensor with shape (B, C), where B is batch size, and C is number of classes.
+            target: torch.LongTensor with shape (B, ) representing ground truth labels.
+            delta: Hyperparameter.
+        Returns:
+            Loss as scalar torch.Tensor.
+    """
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+<p>Rješenje možete započeti razdvajanjem
+izlaza posljednjeg potpuno povezanog sloja
+na vektor logita točnih razreda
+i matricu logita netočnih razreda.
+To možete provesti pozivom funkcije
+<a href="https://pytorch.org/docs/stable/torch.html#torch.masked_select">torch.masked_select</a>,
+pri čemu masku zadajete regularnom odnosno invertiranom
+verzijom matrice s jednojediničnim oznakama podataka.
+Sada razliku između matrice logita netočnih razreda
+i vektora logita točnih razreda
+možemo izračunati običnim oduzimanjem,
+jer PyTorch automatski umnaža (eng. broadcast) operand nižeg reda.
+Pripazite da sve tenzore preoblikujete na ispravni oblik,
+jer funkcija <code class="language-plaintext highlighter-rouge">torch.masked_select</code> vraća tenzor prvog reda.
+Maksimum po elementima možete računati
+odgovarajućom varijantom funkcije
+<a href="https://pytorch.org/docs/stable/torch.html#torch.max">torch.max</a>.</p>
+
+<!--
+  [torch.nn.functional.one_hot](https://pytorch.org/docs/stable/nn.functional.html#one-hot)
+ -->
+<!--
+Pokušajte u zadnjem zadatku unakrsnu entropiju zamijeniti
+višerazrednim gubitkom zglobnice te usporedite rezultate.
+Objašnjenje tog gubitka možete pronaći [ovdje](http://cs231n.github.io/linear-classify/#svm).
+Za sve bodove zadatak je potrebno ostvariti
+primjenom osnovnih Tensorflowovih operacija nad tenzorima.
+
+Pomoć: jedna opcija kako to možete izvesti je da razdvojite logite
+(izlazi iz zadnjeg potpuno povezanog sloja) na matricu logita netočnih razreda i vektor
+logita na mjestima točnih razreda.
+To možete izvesti pomoću operacija `tf.dynamic_partition` i `tf.one_hot`.
+Zatim unutar `tf.maximum` računate razliku
+između matrice logita na netočnim razredima
+i vektora logita na točnim razredima.
+To možete napisati kao običnu razliku
+jer za tenzore različitih dimenzija
+Tensorflow po defaultu napravi *broadcasting*
+ako je to moguće.
+-->
+
+<p><a name="add"></a></p>
+
+<h3 id="dodatni-materijali">Dodatni materijali</h3>
+
+<ul>
+  <li><a href="http://www.deeplearningbook.org/contents/convnets.html">Deep learning book</a></li>
+  <li><a href="http://cs231n.github.io">CS231n Convolutional Neural Networks for Visual Recognition</a></li>
+</ul>
+
+  </article>
+
+</div>
+
+      </div>
+    </div>
+
+
+      </div>
+
+<footer id="footer">
+
+  <p>
+  Ove stranice sastavljaju Petra Bevandić,
+  Marin Oršić, Ivan Grubišić, Josip Šarić
+  i Siniša Šegvić.
+  </p>
+
+  <p>
+  Prva verzija ovih stranica bila je rezultat istraživačkog projekta
+  <a href="http://multiclod.zemris.fer.hr">MULTICLOD</a> (I-2433-2014) Hrvatske zaklade za znanost.
+  </p>
+
+  <p>
+  Izrađeno
+  <a href="http://www.vim.org/">
+  vi
+  </a>
+  -jem i
+  <a href="http://www.gedit.org/">
+  gedit
+  </a>
+  om.
+  </p>
+
+
+  <p>
+  Svi komentari su dobrodošli:
+  <span>
+    <img alt="dubuce1 at fer hr" src="email.png" style="height: 0.9rem; display: inline; margin: 0; border: 0;"/>
+  </span>
+
+    <div style="float: left;">Posljednja promjena: 02-Mar-2026 18:35 CET</div>
+    <div style="float: right;"><a href="https://www.zemris.fer.hr/predmeti/du1/">Povratak</a></div>
+  </p>
+  </footer>
+
+
+  </body>
+<script>hljs.highlightAll();</script>
+</html>
