@@ -7,3 +7,9 @@ torch noreg test acc: 99.09
 torch reg3 test acc: 99.01
 torch reg2 test acc: 98.84
 torch reg1 test acc: 97.39
+
+cifar noreg test acc: 70.75
+cifar reg4 test acc: 68.09
+cifar reg3 test acc: 71.66
+cifar reg2 test acc: 73.83
+cifar reg1 test acc: 50.25

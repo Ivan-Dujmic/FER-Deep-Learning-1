@@ -19,7 +19,12 @@ config = {
     'max_epochs': 8,
     'batch_size': 50,
     'weight-decay': 1e-1,
-    'lr_policy': {1: 1e-1, 3: 1e-2, 5: 1e-3, 7: 1e-4}
+    'lr_policy': {
+        1: 1e-1,
+        3: 1e-2,
+        5: 1e-3,
+        7: 1e-4
+    }
 }
 
 torch.manual_seed(int(time.time() * 1e6) % 2 ** 31)
@@ -29,15 +34,15 @@ torch.manual_seed(int(time.time() * 1e6) % 2 ** 31)
 # mean = train_tensor.mean()
 # std = train_tensor.std()
 # print(f"mean:{mean}, std:{std}")
-ds_mean = 0.13066047430038452
-ds_std = 0.30810782313346863
+ds_mean = (0.13066047430038452,)
+ds_std = (0.30810782313346863,)
 transform = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Normalize(mean=(ds_mean,), std=(ds_std,))
+    transforms.Normalize(mean=ds_mean, std=ds_std)
 ])
 
 ds_train_valid = datasets.MNIST(root=DATA_DIR, train=True, transform=transform, download=True)
-ds_test = datasets.MNIST(root=DATA_DIR, train=False, transform=transform)
+ds_test = datasets.MNIST(root=DATA_DIR, train=False, transform=transform, download=True)
 ds_train, ds_valid = random_split(dataset=ds_train_valid, lengths=[55000, 5000])
 
 loader_train = DataLoader(dataset=ds_train, batch_size=config['batch_size'], shuffle=True)
@@ -50,10 +55,8 @@ class ConvolutionModel(nn.Module):
 
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=5, stride=1, padding=2, bias=True)
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
-
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=5, stride=1, padding=2, bias=True)
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
-
         self.fc = nn.Linear(in_features=32 * 7 * 7, out_features=512, bias=True)
         self.logits = nn.Linear(in_features=512, out_features=10, bias=True)
 
@@ -73,22 +76,18 @@ class ConvolutionModel(nn.Module):
         h = self.conv1(x)
         h = self.pool1(h)
         h = torch.relu(h)
-
         h = self.conv2(h)
         h = self.pool2(h)
         h = torch.relu(h)
-
         h = h.view(h.shape[0], -1)
         h = self.fc(h)
         h = torch.relu(h)
-
         h = self.logits(h)
         return h
     
 def draw_conv1_kernels(epoch, step, kernels, save_dir):
     kernels_ = kernels.copy()
     count = kernels_.shape[0]
-    channels = kernels_.shape[1]
     dims = kernels_.shape[2]
 
     kernels_ -= kernels_.min()
@@ -131,7 +130,7 @@ def evaluate(name, loader, model, loss_func):
     print(f'{name} avg loss = {loss:.2f}\n')
 
 if __name__=="__main__":
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cpu')
     print(f'Device: {device}')
     model = ConvolutionModel().to(device)
     loss_func = nn.CrossEntropyLoss()
@@ -162,7 +161,7 @@ if __name__=="__main__":
 
             optimizer.zero_grad()
             logits = model(x)
-            loss =  loss_func(logits, y)
+            loss = loss_func(logits, y)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
