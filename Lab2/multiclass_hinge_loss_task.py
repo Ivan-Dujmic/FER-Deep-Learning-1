@@ -18,8 +18,8 @@ os.makedirs(name=SAVE_DIR, exist_ok=True)
 config = {
     'max_epochs': 8,
     'batch_size': 50,
-    'weight-decay': 1e-1,
-    'lr_start': 1e-1
+    'weight-decay': 1e-3,
+    'lr_start': 1e-2
 }
 
 torch.manual_seed(int(time.time() * 1e6) % 2 ** 31)
@@ -111,7 +111,18 @@ def draw_conv_filters(epoch, step, weights, save_dir):
     filename = 'epoch_%02d_step_%06d.png' % (epoch, step)
     skimage.io.imsave(os.path.join(save_dir, filename), img)
 
-def evaluate(name, loader, model, loss_func, optimizer):
+def multiclass_hinge_loss(logits, target, delta=1.0):
+    mask = torch.zeros_like(logits, dtype=torch.bool)
+    mask.scatter_(1, target.unsqueeze(1), True)
+    
+    correct = logits.masked_select(mask).view(-1, 1)
+    incorrect = logits.masked_select(~mask).view(logits.size(0), -1)
+    
+    margins = torch.clamp(incorrect - correct + delta, min=0)
+    loss = margins.sum(dim=1).mean()
+    return loss
+
+def evaluate(name, loader, model, optimizer):
     model.eval()
     confusion = np.zeros((10, 10))
     loss = 0
@@ -120,7 +131,7 @@ def evaluate(name, loader, model, loss_func, optimizer):
     with torch.no_grad():
         for x, y in loader:
             logits = model(x)
-            loss += loss_func(logits, y).item()
+            loss += multiclass_hinge_loss(logits, y, delta=1.0)
             pred = torch.argmax(logits, dim=1)
             for t, p in zip(y.view(-1), pred.view(-1)):
                 confusion[t.long(), p.long()] += 1
@@ -184,7 +195,6 @@ if __name__=="__main__":
     device = torch.device('cpu')
     print(f'Device: {device}')
     model = ConvolutionModel().to(device)
-    loss_func = nn.CrossEntropyLoss()
     
     params_reg = [model.conv1.weight, model.conv2.weight, model.fc1.weight, model.fc2.weight]
     params_other = [p for p in model.parameters() if not any(p is reg_p for reg_p in params_reg)]
@@ -218,7 +228,7 @@ if __name__=="__main__":
 
             optimizer.zero_grad()
             logits = model(x)
-            loss = loss_func(logits, y)
+            loss = multiclass_hinge_loss(logits, y, delta=1.0)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
@@ -236,7 +246,7 @@ if __name__=="__main__":
         print(f"Epoch {epoch} finished | Avg loss: {epoch_loss:.4f}")
         
         draw_conv_filters(epoch, (i + 1) * config['batch_size'], model.conv1.weight.detach().numpy(), SAVE_DIR)
-        acc, prec, rec, loss_avg, lr = evaluate("Validation", loader_valid, model, loss_func, optimizer)
+        acc, prec, rec, loss_avg, lr = evaluate("Validation", loader_valid, model, optimizer)
         results['acc_train'].append((correct / total) * 100)
         results['acc_valid'].append(acc)
         results['prec_valid'].append(prec)
@@ -245,6 +255,6 @@ if __name__=="__main__":
         results['loss_valid'].append(loss_avg)
         results['lr'].append(lr)
 
-    evaluate("Test", loader_test, model, loss_func, optimizer)
+    evaluate("Test", loader_test, model, optimizer)
 
     plot_training_progress(SAVE_DIR, results)
