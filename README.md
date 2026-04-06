@@ -3,6 +3,10 @@
 ## Lab1 (+Lab0)
 - Linear regression
 - Logistic regression
-- Fully Connected Deep Models
+- Fully connected deep models
 - Introduction to PyTorch
-- Case Study: MNIST
+- Case study: MNIST
+
+## Lab2
+- Convolutional neural networks
+- Case study: CIFAR-10
