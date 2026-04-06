@@ -125,4 +125,3 @@ def evaluate(name, x, y, net, loss, config):
   loss_avg /= num_batches
   print(name + " accuracy = %.2f" % valid_acc)
   print(name + " avg loss = %.2f\n" % loss_avg)
-

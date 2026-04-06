@@ -1,0 +1,4 @@
+noreg test acc: 99.1
+reg3 test acc: 99.07
+reg2 test acc: 96.66
+reg1 test acc: 96.52
