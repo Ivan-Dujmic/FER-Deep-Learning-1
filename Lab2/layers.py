@@ -219,7 +219,6 @@ class FC(Layer):
     Returns:
       List of params and gradient pairs.
     """
-    # TODO
     grad_weights = grads.T.dot(self.inputs)
     grad_bias = np.sum(grads, axis=0)
     return [[self.weights, grad_weights], [self.bias, grad_bias], self.name]

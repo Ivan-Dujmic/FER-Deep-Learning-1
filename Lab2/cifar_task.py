@@ -10,6 +10,7 @@ import numpy as np
 import skimage.io
 import torch.optim as optim
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 DATA_DIR = Path(__file__).parent / 'datasets'
 SAVE_DIR = Path(__file__).parent / 'out'
@@ -24,7 +25,7 @@ config = {
 
 torch.manual_seed(int(time.time() * 1e6) % 2 ** 31)
 
-# The 10 different classes represent airplanes, cars, birds, cats, deer, dogs, frogs, horses, ships, and trucks
+classes = ['airplane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
 
 # ds = datasets.CIFAR10(root=DATA_DIR, train=True, download=True, transform=transforms.ToTensor())
 # train_tensor = torch.stack([img for img, _ in ds], dim=0)
@@ -111,10 +112,22 @@ def draw_conv_filters(epoch, step, weights, save_dir):
     filename = 'epoch_%02d_step_%06d.png' % (epoch, step)
     skimage.io.imsave(os.path.join(save_dir, filename), img)
 
-def evaluate(name, loader, model, loss_func, optimizer):
+def draw_image(img, mean, std):
+    img = img.transpose(1, 2, 0)
+    img *= std
+    img += mean
+    img = img * 255 
+    img = np.clip(img, 0, 255)  
+    img = img.astype(np.uint8)
+    skimage.io.imshow(img)
+    skimage.io.show()
+
+def evaluate(name, loader, model, loss_func, optimizer, top20worst=False):
     model.eval()
     confusion = np.zeros((10, 10))
     loss = 0
+
+    misses = []
 
     print('\nRunning evaluation: ', name)
     with torch.no_grad():
@@ -124,6 +137,23 @@ def evaluate(name, loader, model, loss_func, optimizer):
             pred = torch.argmax(logits, dim=1)
             for t, p in zip(y.view(-1), pred.view(-1)):
                 confusion[t.long(), p.long()] += 1
+
+            if top20worst:
+                individual_losses = F.cross_entropy(logits, y, reduction='none')
+
+                mask = pred != y
+
+                for i in range(len(y)):
+                    if mask[i]:
+                        top3_probs, top3_idx = torch.topk(logits[i], 3)
+
+                        misses.append({
+                            'image': x[i].cpu().numpy(),
+                            'true': classes[y[i].item()],
+                            'loss': individual_losses[i].item(),
+                            'top3_classes': [classes[j.item()] for j in top3_idx],
+                            'top3_probs': top3_probs.cpu().numpy()
+                        })
 
     correct = np.trace(confusion)
     total = confusion.sum()
@@ -142,6 +172,15 @@ def evaluate(name, loader, model, loss_func, optimizer):
     print(f'{name} avg loss = {loss:.2f}')
     print(f'{name} learning rate = {lr:.4f}')
     print()
+
+    if top20worst:
+        misses.sort(key=lambda item: item['loss'], reverse=True)
+        top20 = misses[:20]
+        for image in top20:
+            print(f"Image loss: {image['loss']:.4f}")
+            print(f"True: {image['true']}")
+            print(f"Top3: {image['top3_classes'][0]} {image['top3_classes'][1]} {image['top3_classes'][2]}")
+            draw_image(image['image'], ds_mean, ds_std)
 
     return acc, prec, rec, loss, lr
 
@@ -245,6 +284,6 @@ if __name__=="__main__":
         results['loss_valid'].append(loss_avg)
         results['lr'].append(lr)
 
-    evaluate("Test", loader_test, model, loss_func, optimizer)
+    evaluate("Test", loader_test, model, loss_func, optimizer, True)
 
     plot_training_progress(SAVE_DIR, results)

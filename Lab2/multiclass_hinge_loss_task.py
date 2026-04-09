@@ -118,7 +118,7 @@ def multiclass_hinge_loss(logits, target, delta=1.0):
     correct = logits.masked_select(mask).view(-1, 1)
     incorrect = logits.masked_select(~mask).view(logits.size(0), -1)
     
-    margins = torch.clamp(incorrect - correct + delta, min=0)
+    margins = torch.relu(incorrect - correct + delta)
     loss = margins.sum(dim=1).mean()
     return loss
 
