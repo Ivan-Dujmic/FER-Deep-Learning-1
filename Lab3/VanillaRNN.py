@@ -2,7 +2,7 @@ import torch
 import Loader
 import Trainer
 
-class RNN(torch.nn.Module):
+class VanillaRNN(torch.nn.Module):
     def __init__(self, embedding):
         super().__init__()
         self.embedding = embedding
@@ -20,7 +20,7 @@ class RNN(torch.nn.Module):
         h = self.embedding(x)
         h = h.transpose(0, 1)
         h = torch.nn.utils.rnn.pack_padded_sequence(h, lengths.cpu(), batch_first=False, enforce_sorted=False)
-        out, h = self.rnn(h)
+        _, h = self.rnn(h)
         hidden = h[-1]
         h = self.fc1(hidden)
         h = torch.relu(h)
@@ -72,7 +72,7 @@ if __name__ == "__main__":
         collate_fn=lambda batch: Loader.collate_fn(batch, pad_index=pad_idx)
     )
 
-    model = RNN(embeddings)
+    model = VanillaRNN(embeddings)
 
     criterion = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)

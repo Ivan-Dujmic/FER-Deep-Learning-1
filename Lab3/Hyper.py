@@ -2,52 +2,7 @@ import torch
 import os
 import Loader
 import Trainer
-
-class RNN(torch.nn.Module):
-    def __init__(self, embedding, rnn_type='RNN', hidden_size=150, num_layers=2, dropout=0.0, bidirectional=False):
-        super().__init__()
-        self.embedding = embedding
-        rnn_type = rnn_type.upper()
-        if rnn_type not in ['RNN', 'GRU', 'LSTM']:
-            raise ValueError(f"Unsupported RNN type: {rnn_type}")
-        
-        rnn_class = getattr(torch.nn, rnn_type)
-
-        rnn_dropout = dropout if num_layers > 1 else 0.0
-
-        self.rnn = rnn_class(
-            input_size=300,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            dropout=rnn_dropout,
-            batch_first=False,
-            bidirectional=bidirectional,
-        )
-
-        self.directional_factor = 2 if bidirectional else 1
-
-        self.fc1 = torch.nn.Linear(hidden_size * self.directional_factor, 150)
-        self.fc2 = torch.nn.Linear(150, 1)
-
-    def forward(self, x, lengths):
-        h = self.embedding(x)
-        h = h.transpose(0, 1)
-        h = torch.nn.utils.rnn.pack_padded_sequence(h, lengths.cpu(), batch_first=False, enforce_sorted=False)
-        _, h = self.rnn(h)
-        if isinstance(h, tuple): # LSTM returns (h_n, c_n)
-            h = h[0]
-
-        if self.directional_factor == 2:
-            hidden = torch.cat((h[-2,:,:], h[-1,:,:]), dim=1)
-        else:
-            hidden = h[-1]
-
-        h = self.fc1(hidden)
-        h = torch.relu(h)
-        h = self.fc2(h)
-
-        return h.squeeze(1)
-    
+import RNN
 
 def run_experiment(config, train_loader, valid_loader, test_loader, embeddings, epochs, lr, clip):
     model = RNN(
