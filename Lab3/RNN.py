@@ -2,31 +2,38 @@ import torch
 import Loader
 import Trainer
 
-
-class MeanPoolingModel(torch.nn.Module):
+class RNN(torch.nn.Module):
     def __init__(self, embedding):
         super().__init__()
         self.embedding = embedding
-        self.fc1 = torch.nn.Linear(300, 150)
-        self.fc2 = torch.nn.Linear(150, 150)
-        self.fc3 = torch.nn.Linear(150, 1)
-    
+        self.rnn = torch.nn.RNN(
+            input_size=300,
+            hidden_size=150,
+            num_layers=2,
+            batch_first=False,
+            bidirectional=False
+        )
+        self.fc1 = torch.nn.Linear(150, 150)
+        self.fc2 = torch.nn.Linear(150, 1)
+
     def forward(self, x, lengths):
         h = self.embedding(x)
-        h = h.sum(dim=1) / lengths.unsqueeze(1).float()
-        h = self.fc1(h)
+        h = h.transpose(0, 1)
+        h = torch.nn.utils.rnn.pack_padded_sequence(h, lengths.cpu(), batch_first=False, enforce_sorted=False)
+        out, h = self.rnn(h)
+        hidden = h[-1]
+        h = self.fc1(hidden)
         h = torch.relu(h)
         h = self.fc2(h)
-        h = torch.relu(h)
-        h = self.fc3(h)
-        return h.squeeze(1)
 
+        return h.squeeze(1)
+    
 
 if __name__ == "__main__":
     batch_sizes = {"train": 10, "valid": 32, "test": 32}
     lr = 1e-4
     epochs = 5
-    clip = 1.0
+    clip = 0.25
 
     train_dataset = Loader.load_instances('datasets/sst_train_raw.csv')
     valid_dataset = Loader.load_instances('datasets/sst_valid_raw.csv')
@@ -65,7 +72,7 @@ if __name__ == "__main__":
         collate_fn=lambda batch: Loader.collate_fn(batch, pad_index=pad_idx)
     )
 
-    model = MeanPoolingModel(embeddings)
+    model = RNN(embeddings)
 
     criterion = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
