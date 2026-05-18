@@ -1,0 +1,55 @@
+### PRE-TRAINED EMBEDDINGS VS RANDOM ###
+Model: baseline | Pretrained: True --> Test Acc: 0.7810, F1: 0.7899
+Model: baseline | Pretrained: False --> Test Acc: 0.6617, F1: 0.6299
+Model: gru | Pretrained: True --> Test Acc: 0.7764, F1: 0.7740
+Model: gru | Pretrained: False --> Test Acc: 0.6961, F1: 0.6650
+
+### HYPERPARAMETER SEARCH ###
+
+# Model Type: baseline
+Varying min_freq=1 --> Loss: 0.4885 | Acc: 0.7569 | F1: 0.7725
+Varying min_freq=3 --> Loss: 0.4900 | Acc: 0.7580 | F1: 0.7674
+Varying min_freq=5 --> Loss: 0.5382 | Acc: 0.7500 | F1: 0.7572
+Varying lr=1e-05 --> Loss: 0.6804 | Acc: 0.5356 | F1: 0.1138
+Varying lr=0.0001 --> Loss: 0.4823 | Acc: 0.7764 | F1: 0.7625
+Varying lr=0.001 --> Loss: 0.4666 | Acc: 0.7787 | F1: 0.7809
+Varying batch_size=10 --> Loss: 0.4763 | Acc: 0.7569 | F1: 0.7735
+Varying batch_size=32 --> Loss: 0.5073 | Acc: 0.7397 | F1: 0.6993
+Varying batch_size=64 --> Loss: 0.4985 | Acc: 0.7615 | F1: 0.7438
+Varying dropout=0.0 --> Loss: 0.5748 | Acc: 0.7041 | F1: 0.6436
+Varying dropout=0.3 --> Loss: 0.4912 | Acc: 0.7557 | F1: 0.7760
+Varying dropout=0.6 --> Loss: 0.5796 | Acc: 0.6927 | F1: 0.6298
+Varying hidden_size=50 --> Loss: 0.5218 | Acc: 0.7706 | F1: 0.7630
+Varying hidden_size=150 --> Loss: 0.5577 | Acc: 0.7099 | F1: 0.7473
+Varying hidden_size=300 --> Loss: 0.4754 | Acc: 0.7718 | F1: 0.7796
+Varying clip=0.1 --> Loss: 0.5842 | Acc: 0.7076 | F1: 0.7483
+Varying clip=0.25 --> Loss: 0.4774 | Acc: 0.7649 | F1: 0.7460
+Varying clip=1.0 --> Loss: 0.5223 | Acc: 0.7351 | F1: 0.7611
+
+# Model Type: gru
+Varying min_freq=1 --> Loss: 0.5546 | Acc: 0.7511 | F1: 0.7270
+Varying min_freq=3 --> Loss: 0.4810 | Acc: 0.7626 | F1: 0.7703
+Varying min_freq=5 --> Loss: 0.4837 | Acc: 0.7603 | F1: 0.7660
+Varying lr=1e-05 --> Loss: 0.6129 | Acc: 0.6846 | F1: 0.6196
+Varying lr=0.0001 --> Loss: 0.5102 | Acc: 0.7626 | F1: 0.7850
+Varying lr=0.001 --> Loss: 0.4164 | Acc: 0.8303 | F1: 0.8287
+Varying batch_size=10 --> Loss: 0.4554 | Acc: 0.7764 | F1: 0.7910
+Varying batch_size=32 --> Loss: 0.4870 | Acc: 0.7764 | F1: 0.7914
+Varying batch_size=64 --> Loss: 0.5373 | Acc: 0.7523 | F1: 0.7717
+Varying dropout=0.0 --> Loss: 0.5944 | Acc: 0.7110 | F1: 0.6675
+Varying dropout=0.3 --> Loss: 0.5033 | Acc: 0.7672 | F1: 0.7939
+Varying dropout=0.6 --> Loss: 0.5605 | Acc: 0.7466 | F1: 0.7170
+Varying hidden_size=50 --> Loss: 0.4816 | Acc: 0.7878 | F1: 0.7758
+Varying hidden_size=150 --> Loss: 0.5016 | Acc: 0.7580 | F1: 0.7905
+Varying hidden_size=300 --> Loss: 0.5468 | Acc: 0.7695 | F1: 0.7452
+Varying clip=0.1 --> Loss: 0.4623 | Acc: 0.7821 | F1: 0.8000
+Varying clip=0.25 --> Loss: 0.5247 | Acc: 0.7523 | F1: 0.7273
+Varying clip=1.0 --> Loss: 0.5277 | Acc: 0.7431 | F1: 0.7800
+
+### BEST CONFIGURATIONS RUNS ###
+Model: baseline over 5 runs:
+  Accuracy: Mean = 0.7534, Std = 0.0162
+  F1-Score: Mean = 0.7563, Std = 0.0207
+Model: gru over 5 runs:
+  Accuracy: Mean = 0.8147, Std = 0.0073
+  F1-Score: Mean = 0.8151, Std = 0.0096

@@ -3,6 +3,7 @@ import os
 import Loader
 import Trainer
 
+
 class RNN(torch.nn.Module):
     def __init__(self, embedding, rnn_type='RNN', hidden_size=150, num_layers=2, dropout=0.0, bidirectional=False):
         super().__init__()
