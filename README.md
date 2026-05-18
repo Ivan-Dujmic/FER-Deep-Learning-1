@@ -10,3 +10,8 @@
 ## Lab2
 - Convolutional neural networks
 - Case study: CIFAR-10
+
+## Lab3
+- Text data loading
+- Recurrent neural networks (RNN, GRU, LSTM)
+- Case study: SST
