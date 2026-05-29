@@ -1,0 +1,437 @@
+
+<!DOCTYPE html>
+<html>
+
+  <head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>Četvrta laboratorijska vježba iz Dubokog učenja</title>
+  <link rel="stylesheet" type="text/css" href="./dl.css" >
+  <link rel="stylesheet" href="./highlight/styles/default.min.css">
+  <script type="text/javascript" src="./mathjax/tex-mml-chtml.js"></script>
+  <script src="./highlight/highlight.min.js"></script>
+    
+</head>
+
+
+    <body>
+
+    <div id="page">
+<h2 id="4-vježba-metričko-ugrađivanje">4. vježba: Metričko ugrađivanje</h2>
+<!-- <p>Predavanje o metričkom ugrađivanju moguće je naći na <a href="./pubs/du7metrics.pdf">neslužbenim stranicama predmeta</a>.</p> -->
+
+<p><a name="1zad"></a></p>
+
+<h3 id="1-zadatak-učitavanje-podataka-10">1. zadatak: Učitavanje podataka (10%)</h3>
+<p>Izvedite učitavanje podataka tako da se omogući 
+učenje modela za metričko ugrađivanje trojnim gubitkom.
+Da bismo to napravili, potrebno je prilagoditi MNIST dataset 
+tako da se prilikom dohvata primjera za
+treniranje (sidra), dohvaćaju i odgovarajući pozitivan i negativan primjer.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="kn">import</span> <span class="n">Dataset</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">choice</span>
+<span class="kn">import</span> <span class="nn">torchvision</span>
+
+
+<span class="k">class</span> <span class="nc">MNISTMetricDataset</span><span class="p">(</span><span class="n">Dataset</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="o">=</span><span class="s">"/tmp/mnist/"</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s">'train'</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">().</span><span class="n">__init__</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">split</span> <span class="ow">in</span> <span class="p">[</span><span class="s">'train'</span><span class="p">,</span> <span class="s">'test'</span><span class="p">,</span> <span class="s">'traineval'</span><span class="p">]</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">root</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">split</span> <span class="o">=</span> <span class="n">split</span>
+        <span class="n">mnist_ds</span> <span class="o">=</span> <span class="n">torchvision</span><span class="p">.</span><span class="n">datasets</span><span class="p">.</span><span class="n">MNIST</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">root</span><span class="p">,</span> <span class="n">train</span><span class="o">=</span><span class="s">'train'</span> <span class="ow">in</span> <span class="n">split</span><span class="p">,</span> <span class="n">download</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">images</span><span class="p">,</span> <span class="bp">self</span><span class="p">.</span><span class="n">targets</span> <span class="o">=</span> <span class="n">mnist_ds</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="nb">float</span><span class="p">()</span> <span class="o">/</span> <span class="mf">255.</span><span class="p">,</span> <span class="n">mnist_ds</span><span class="p">.</span><span class="n">targets</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">classes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="p">.</span><span class="n">target2indices</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">images</span><span class="p">)):</span>
+            <span class="bp">self</span><span class="p">.</span><span class="n">target2indices</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">targets</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">item</span><span class="p">()]</span> <span class="o">+=</span> <span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_sample_negative</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="c1"># YOUR CODE HERE
+</span>
+
+    <span class="k">def</span> <span class="nf">_sample_positive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="c1"># YOUR CODE HERE
+</span>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="n">anchor</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">images</span><span class="p">[</span><span class="n">index</span><span class="p">].</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">target_id</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">targets</span><span class="p">[</span><span class="n">index</span><span class="p">].</span><span class="n">item</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="p">.</span><span class="n">split</span> <span class="ow">in</span> <span class="p">[</span><span class="s">'traineval'</span><span class="p">,</span> <span class="s">'val'</span><span class="p">,</span> <span class="s">'test'</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">anchor</span><span class="p">,</span> <span class="n">target_id</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">positive</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">_sample_positive</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+            <span class="n">negative</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">_sample_negative</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+            <span class="n">positive</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">images</span><span class="p">[</span><span class="n">positive</span><span class="p">]</span>
+            <span class="n">negative</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">images</span><span class="p">[</span><span class="n">negative</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">anchor</span><span class="p">,</span> <span class="n">positive</span><span class="p">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">negative</span><span class="p">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">target_id</span>
+
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">images</span><span class="p">)</span>
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+
+<p>Implementirajte metode <code class="language-plaintext highlighter-rouge">_sample_positive</code> i <code class="language-plaintext highlighter-rouge">_sample_negative</code> 
+tako da njihove povratne vrijednosti odgovaraju 
+indeksima uzorkovanih slika u listi <code class="language-plaintext highlighter-rouge">self.images</code>.
+Za potrebe ove vježbe dovoljno je implementirati jednostavno uzorkovanje 
+koje će za pozitivni primjer uzorkovati slučajnu sliku 
+koja pripada istom razredu kao sidro,
+a za negativni primjer slučajnu sliku koja pripada 
+bilo kojem razredu različitom od razreda sidra.</p>
+
+<p><a name="2zad"></a></p>
+
+<h3 id="2-zadatak-definicija-modela-za-metričko-ugrađivanje-40">2. zadatak: Definicija modela za metričko ugrađivanje (40%)</h3>
+
+<p>Zadan je kod koji definira grubu strukturu 
+modela za metričko ugrađivanje.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="n">nn</span>
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="n">F</span>
+
+
+<span class="k">class</span> <span class="nc">_BNReluConv</span><span class="p">(</span><span class="n">nn</span><span class="p">.</span><span class="n">Sequential</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_maps_in</span><span class="p">,</span> <span class="n">num_maps_out</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">_BNReluConv</span><span class="p">,</span> <span class="bp">self</span><span class="p">).</span><span class="n">__init__</span><span class="p">()</span>
+        <span class="c1"># YOUR CODE HERE
+</span>
+<span class="k">class</span> <span class="nc">SimpleMetricEmbedding</span><span class="p">(</span><span class="n">nn</span><span class="p">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_channels</span><span class="p">,</span> <span class="n">emb_size</span><span class="o">=</span><span class="mi">32</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">().</span><span class="n">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">emb_size</span> <span class="o">=</span> <span class="n">emb_size</span>
+        <span class="c1"># YOUR CODE HERE
+</span>
+    <span class="k">def</span> <span class="nf">get_features</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">img</span><span class="p">):</span>
+        <span class="c1"># Returns tensor with dimensions BATCH_SIZE, EMB_SIZE
+</span>        <span class="c1"># YOUR CODE HERE
+</span>        <span class="n">x</span> <span class="o">=</span> <span class="p">...</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+    <span class="k">def</span> <span class="nf">loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">anchor</span><span class="p">,</span> <span class="n">positive</span><span class="p">,</span> <span class="n">negative</span><span class="p">):</span>
+        <span class="n">a_x</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">get_features</span><span class="p">(</span><span class="n">anchor</span><span class="p">)</span>
+        <span class="n">p_x</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">get_features</span><span class="p">(</span><span class="n">positive</span><span class="p">)</span>
+        <span class="n">n_x</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">get_features</span><span class="p">(</span><span class="n">negative</span><span class="p">)</span>
+        <span class="c1"># YOUR CODE HERE
+</span>        <span class="n">loss</span> <span class="o">=</span> <span class="p">...</span>
+        <span class="k">return</span> <span class="n">loss</span>
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+<p>Nadopunite naš predložak prema sljedećim uputama.</p>
+
+<h4 id="a-gubitak">a) gubitak</h4>
+<p>Implementirajte trojni gubitak po uzoru na pytorchev <a href="https://pytorch.org/docs/stable/generated/torch.nn.TripletMarginLoss.html"><code class="language-plaintext highlighter-rouge">TripletMarginLoss</code></a>.</p>
+
+<h4 id="b-konvolucijska-jedinica-bnreluconv">b) konvolucijska jedinica BNReLUConv</h4>
+<p>U praksi je praktično izdvojiti 
+dio modela koji se često ponavlja 
+u dijeljeni diferencijabilni modul. 
+Oblikujte konvolucijsku jedinicu <code class="language-plaintext highlighter-rouge">BNReLUConv</code> 
+koji se sastoji od normalizacije po grupi, 
+aktivacije ReLU i konvolucije.
+Primijetite da naš predložak nasljeđuje razred 
+<a href="https://pytorch.org/docs/stable/generated/torch.nn.Sequential.html">Sequential</a>.
+To znači da za dodavanje slojeva u konstruktoru 
+možete koristiti metodu <code class="language-plaintext highlighter-rouge">append</code>.</p>
+
+<h4 id="c-metričko-ugrađivanje">c) metričko ugrađivanje</h4>
+<p>Dovršite izvedbu modela za metričko ugrađivanje. 
+Neka se vaš model sastoji od 3 uzastopne konvoluijske jedinice <code class="language-plaintext highlighter-rouge">BNReLUConv</code> 
+(neka veličina jezgre bude 3, a broj mapa značajki - <code class="language-plaintext highlighter-rouge">emb_size</code>) 
+razdvojena sažimanjem maksimumom 
+s veličinom jezgre 3 i korakom 2. 
+Konačno ugrađivanje slike izlučite 
+globalnim sažimanjem prosjekom.
+Pripazite da izlazni tenzor u metodi <code class="language-plaintext highlighter-rouge">get_features</code> 
+zadrži prvu dimenziju koja označava veličinu minigrupe, 
+čak i kada je ona jednaka 1.</p>
+
+<p><a name="3zad"></a></p>
+
+<h3 id="3-zadatak-učenje-i-vrednovanje-40">3. zadatak: Učenje i vrednovanje (40%)</h3>
+
+<p>Zadan je kod za učenje modela za metričko ugrađivanje na MNIST podatacima. Ovaj kod koristi pomoćnu skriptu <code class="language-plaintext highlighter-rouge">utils.py</code> dostupnu <a href="https://github.com/dlunizg/dlunizg.github.io/tree/master/data/lab4/utils.py">ovdje</a>.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">torch.optim</span>
+<span class="kn">from</span> <span class="nn">dataset</span> <span class="kn">import</span> <span class="n">MNISTMetricDataset</span>
+<span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="kn">import</span> <span class="n">DataLoader</span>
+<span class="kn">from</span> <span class="nn">model</span> <span class="kn">import</span> <span class="n">SimpleMetricEmbedding</span>
+<span class="kn">from</span> <span class="nn">utils</span> <span class="kn">import</span> <span class="n">train</span><span class="p">,</span> <span class="n">evaluate</span><span class="p">,</span> <span class="n">compute_representations</span>
+
+<span class="n">EVAL_ON_TEST</span> <span class="o">=</span> <span class="bp">True</span>
+<span class="n">EVAL_ON_TRAIN</span> <span class="o">=</span> <span class="bp">False</span>
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">'__main__'</span><span class="p">:</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="s">'cuda'</span> <span class="k">if</span> <span class="n">torch</span><span class="p">.</span><span class="n">cuda</span><span class="p">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s">'cpu'</span>
+    <span class="k">print</span><span class="p">(</span><span class="sa">f</span><span class="s">"= Using device </span><span class="si">{</span><span class="n">device</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+
+    <span class="c1"># CHANGE ACCORDING TO YOUR PREFERENCE
+</span>    <span class="n">mnist_download_root</span> <span class="o">=</span> <span class="s">"./mnist/"</span>
+    <span class="n">ds_train</span> <span class="o">=</span> <span class="n">MNISTMetricDataset</span><span class="p">(</span><span class="n">mnist_download_root</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s">'train'</span><span class="p">)</span>
+    <span class="n">ds_test</span> <span class="o">=</span> <span class="n">MNISTMetricDataset</span><span class="p">(</span><span class="n">mnist_download_root</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s">'test'</span><span class="p">)</span>
+    <span class="n">ds_traineval</span> <span class="o">=</span> <span class="n">MNISTMetricDataset</span><span class="p">(</span><span class="n">mnist_download_root</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s">'traineval'</span><span class="p">)</span>
+
+    <span class="n">num_classes</span> <span class="o">=</span> <span class="mi">10</span>
+
+    <span class="k">print</span><span class="p">(</span><span class="sa">f</span><span class="s">"&gt; Loaded </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ds_train</span><span class="p">)</span><span class="si">}</span><span class="s"> training images!"</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="sa">f</span><span class="s">"&gt; Loaded </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ds_test</span><span class="p">)</span><span class="si">}</span><span class="s"> validation images!"</span><span class="p">)</span>
+
+    <span class="n">train_loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span>
+        <span class="n">ds_train</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+        <span class="n">shuffle</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+        <span class="n">pin_memory</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">drop_last</span><span class="o">=</span><span class="bp">True</span>
+    <span class="p">)</span>
+
+    <span class="n">test_loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span>
+        <span class="n">ds_test</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">shuffle</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span>
+        <span class="n">pin_memory</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span>
+    <span class="p">)</span>
+
+    <span class="n">traineval_loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span>
+        <span class="n">ds_traineval</span><span class="p">,</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">shuffle</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span>
+        <span class="n">pin_memory</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span>
+    <span class="p">)</span>
+
+    <span class="n">emb_size</span> <span class="o">=</span> <span class="mi">32</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">SimpleMetricEmbedding</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">emb_size</span><span class="p">).</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="p">.</span><span class="n">optim</span><span class="p">.</span><span class="n">Adam</span><span class="p">(</span>
+        <span class="n">model</span><span class="p">.</span><span class="n">parameters</span><span class="p">(),</span>
+        <span class="n">lr</span><span class="o">=</span><span class="mf">1e-3</span>
+    <span class="p">)</span>
+
+    <span class="n">epochs</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">epochs</span><span class="p">):</span>
+        <span class="k">print</span><span class="p">(</span><span class="sa">f</span><span class="s">"Epoch: </span><span class="si">{</span><span class="n">epoch</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+        <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="p">.</span><span class="n">time_ns</span><span class="p">()</span>
+        <span class="n">train_loss</span> <span class="o">=</span> <span class="n">train</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">train_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="k">print</span><span class="p">(</span><span class="sa">f</span><span class="s">"Mean Loss in Epoch </span><span class="si">{</span><span class="n">epoch</span><span class="si">}</span><span class="s">: </span><span class="si">{</span><span class="n">train_loss</span><span class="si">:</span><span class="p">.</span><span class="mi">3</span><span class="n">f</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">EVAL_ON_TEST</span> <span class="ow">or</span> <span class="n">EVAL_ON_TRAIN</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">"Computing mean representations for evaluation..."</span><span class="p">)</span>
+            <span class="n">representations</span> <span class="o">=</span> <span class="n">compute_representations</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">train_loader</span><span class="p">,</span> <span class="n">num_classes</span><span class="p">,</span> <span class="n">emb_size</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">EVAL_ON_TRAIN</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">"Evaluating on training set..."</span><span class="p">)</span>
+            <span class="n">acc1</span> <span class="o">=</span> <span class="n">evaluate</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">representations</span><span class="p">,</span> <span class="n">traineval_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+            <span class="k">print</span><span class="p">(</span><span class="sa">f</span><span class="s">"Epoch </span><span class="si">{</span><span class="n">epoch</span><span class="si">}</span><span class="s">: Train Top1 Acc: </span><span class="si">{</span><span class="nb">round</span><span class="p">(</span><span class="n">acc1</span> <span class="o">*</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span><span class="si">}</span><span class="s">%"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">EVAL_ON_TEST</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">"Evaluating on test set..."</span><span class="p">)</span>
+            <span class="n">acc1</span> <span class="o">=</span> <span class="n">evaluate</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">representations</span><span class="p">,</span> <span class="n">test_loader</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+            <span class="k">print</span><span class="p">(</span><span class="sa">f</span><span class="s">"Epoch </span><span class="si">{</span><span class="n">epoch</span><span class="si">}</span><span class="s">: Test Accuracy: </span><span class="si">{</span><span class="n">acc1</span> <span class="o">*</span> <span class="mi">100</span><span class="si">:</span><span class="p">.</span><span class="mi">2</span><span class="n">f</span><span class="si">}</span><span class="s">%"</span><span class="p">)</span>
+        <span class="n">t1</span> <span class="o">=</span> <span class="n">time</span><span class="p">.</span><span class="n">time_ns</span><span class="p">()</span>
+        <span class="k">print</span><span class="p">(</span><span class="sa">f</span><span class="s">"Epoch time (sec): </span><span class="si">{</span><span class="p">(</span><span class="n">t1</span><span class="o">-</span><span class="n">t0</span><span class="p">)</span><span class="o">/</span><span class="mi">10</span><span class="o">**</span><span class="mi">9</span><span class="si">:</span><span class="p">.</span><span class="mi">1</span><span class="n">f</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+<h4 id="a-analiza-modula-utilspy">a) Analiza modula <code class="language-plaintext highlighter-rouge">utils.py</code></h4>
+<p>Proučite funkcije za učenje i vrednovanje u modelu <code class="language-plaintext highlighter-rouge">utils.py</code>. 
+Kako se računaju reprezentacije razreda? 
+Kako se provodi klasifikacija primjera? 
+Probajte smisliti alternativne pristupe za klasifikaciju primjera.</p>
+
+<h4 id="b-klasifikacija-na-temelju-metričkog-ugrađivanja">b) Klasifikacija na temelju metričkog ugrađivanja</h4>
+<p>Naučite model za metričko ugrađivanje iz zadatka 2.c 
+na podskupu za treniranje skupa MNIST. 
+Provedite klasifikaciju slika iz podskupa za validaciju i izmjerite točnost.</p>
+
+<h4 id="c-klasifikacija-na-temelju-udaljenosti-u-prostoru-slike">c) Klasifikacija na temelju udaljenosti u prostoru slike</h4>
+<p>Ponovo provedite klasifikaciju na podskupu za validaciju, 
+ali ovaj put u prostoru slike.
+Ostvarite taj zadatak oblikovanjem
+razreda koji u metodi <code class="language-plaintext highlighter-rouge">get_features</code> 
+provodi jednostavnu vektorizaciju slike.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="k">class</span> <span class="nc">IdentityModel</span><span class="p">(</span><span class="n">nn</span><span class="p">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">IdentityModel</span><span class="p">,</span> <span class="bp">self</span><span class="p">).</span><span class="n">__init__</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">get_features</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">img</span><span class="p">):</span>
+        <span class="c1"># YOUR CODE HERE
+</span>        <span class="n">feats</span> <span class="o">=</span> <span class="p">...</span>
+        <span class="k">return</span> <span class="n">feats</span>
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+
+<p>Implementirajte razred <code class="language-plaintext highlighter-rouge">IdentityModel</code>
+prema prikazanom predlošku. 
+Modificirajte funkciju za učenje tako da se 
+klasifikacija provodi u prostoru slike. 
+Primijetite da se <code class="language-plaintext highlighter-rouge">IdentityModel</code> ne može trenirati. 
+Izmjerite točnost klasifikacije na podskupu za validaciju.</p>
+
+<h4 id="d-pohranjivanje-parametara-modela">d) Pohranjivanje parametara modela</h4>
+
+<p>U praksi je praktično pohraniti parametre naučenog modela 
+za kasnije korištenje u fazi zaključivanja. 
+Modificirajte funkciju za učenje 
+tako da pohranite naučene parametre 
+korištenjem funkcije <a href="https://pytorch.org/docs/stable/generated/torch.save.html">‘torch.save’</a>. 
+Iznova naučite model za metričko ugrađivanje 
+i pohranite dobivene parametre.</p>
+
+<h4 id="e-klasifikacija-neviđenih-razreda">e) Klasifikacija neviđenih razreda</h4>
+
+<p>Jedna od prednosti učenja metričkog ugrađivanja 
+nad standardnim klasifikacijskim modelima jest 
+mogućnost dodavanja novih klasa u fazi zaključivanja.
+Modificirajte konstruktor <code class="language-plaintext highlighter-rouge">MNISTMetricDataset</code> 
+tako da se omogući uklanjanje primjera 
+odabrane klase iz skupa za učenje:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="o">=</span><span class="s">"/tmp/mnist/"</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s">'train'</span><span class="p">,</span> <span class="n">remove_class</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">().</span><span class="n">__init__</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">split</span> <span class="ow">in</span> <span class="p">[</span><span class="s">'train'</span><span class="p">,</span> <span class="s">'test'</span><span class="p">,</span> <span class="s">'traineval'</span><span class="p">]</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">root</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">split</span> <span class="o">=</span> <span class="n">split</span>
+        <span class="n">mnist_ds</span> <span class="o">=</span> <span class="n">torchvision</span><span class="p">.</span><span class="n">datasets</span><span class="p">.</span><span class="n">MNIST</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">root</span><span class="p">,</span> <span class="n">train</span><span class="o">=</span><span class="s">'train'</span> <span class="ow">in</span> <span class="n">split</span><span class="p">,</span> <span class="n">download</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">images</span><span class="p">,</span> <span class="bp">self</span><span class="p">.</span><span class="n">targets</span> <span class="o">=</span> <span class="n">mnist_ds</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="nb">float</span><span class="p">()</span> <span class="o">/</span> <span class="mf">255.</span><span class="p">,</span> <span class="n">mnist_ds</span><span class="p">.</span><span class="n">targets</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">classes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">remove_class</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="c1"># Filter out images with target class equal to remove_class
+</span>            <span class="c1"># YOUR CODE HERE
+</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">target2indices</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">images</span><span class="p">)):</span>
+            <span class="bp">self</span><span class="p">.</span><span class="n">target2indices</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">targets</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">item</span><span class="p">()]</span> <span class="o">+=</span> <span class="p">[</span><span class="n">i</span><span class="p">]</span>
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+
+<p>Iz podskupa za treniranje uklonite razred 0 
+te istrenirajte novi model za metričko ugrađivanje iz zadatka 2. 
+Klasificirajte sve slike (uključujući i razred 0) iz podskupa za validaciju 
+na temelju sličnosti u prostoru značajki. 
+Primijetite da ćete trebati imati dva loadera podskupa za učenje.
+Prvi razred će ignorirati slike znamenke 0, 
+a koristit ćete ga za učenje modela.
+Drugi razred će čitati slike sa svim znamenkama,
+a iskoristit ćete ga za dobivanje 
+prosječne reprezentacije znamenki svih razreda. 
+Pohranite parametre naučenog modela
+i prikažite postignutu klasifikacijsku točnost.</p>
+
+<p><a name="4zad"></a></p>
+
+<h3 id="4-zadatak-vizualizacija-podataka-10">4. zadatak: Vizualizacija podataka (10%)</h3>
+
+<p>Kvalitetu metričkog ugrađivanja možemo i kvalitativno procijeniti
+uspordbom razmještaja podataka u prostoru značajki i prostoru slike. 
+S obzirom na to da je visokodimenzionalne podatke 
+nemoguće vizualizirati u originalnom prostoru, 
+primjere je potrebno prebaciti u 2D prostor. 
+Ovo možemo provesti <a href="https://en.wikipedia.org/wiki/Principal_component_analysis">analizom svojstvenih komponenti</a>. 
+Obratite pažnju na to da torchu nudi 
+gotovu implementaciju kroz funkciju <a href="https://pytorch.org/docs/stable/generated/torch.pca_lowrank.html">pca_lowrank</a>.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="n">np</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">from</span> <span class="nn">dataset</span> <span class="kn">import</span> <span class="n">MNISTMetricDataset</span>
+<span class="kn">from</span> <span class="nn">model</span> <span class="kn">import</span> <span class="n">SimpleMetricEmbedding</span>
+<span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span>
+
+
+<span class="k">def</span> <span class="nf">get_colormap</span><span class="p">():</span>
+    <span class="c1"># Cityscapes colormap for first 10 classes
+</span>    <span class="n">colormap</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">10</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="p">.</span><span class="n">uint8</span><span class="p">)</span>
+    <span class="n">colormap</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">128</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">]</span>
+    <span class="n">colormap</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">244</span><span class="p">,</span> <span class="mi">35</span><span class="p">,</span> <span class="mi">232</span><span class="p">]</span>
+    <span class="n">colormap</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">70</span><span class="p">,</span> <span class="mi">70</span><span class="p">,</span> <span class="mi">70</span><span class="p">]</span>
+    <span class="n">colormap</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">102</span><span class="p">,</span> <span class="mi">102</span><span class="p">,</span> <span class="mi">156</span><span class="p">]</span>
+    <span class="n">colormap</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">190</span><span class="p">,</span> <span class="mi">153</span><span class="p">,</span> <span class="mi">153</span><span class="p">]</span>
+    <span class="n">colormap</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">153</span><span class="p">,</span> <span class="mi">153</span><span class="p">,</span> <span class="mi">153</span><span class="p">]</span>
+    <span class="n">colormap</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">250</span><span class="p">,</span> <span class="mi">170</span><span class="p">,</span> <span class="mi">30</span><span class="p">]</span>
+    <span class="n">colormap</span><span class="p">[</span><span class="mi">7</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">220</span><span class="p">,</span> <span class="mi">220</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">colormap</span><span class="p">[</span><span class="mi">8</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">107</span><span class="p">,</span> <span class="mi">142</span><span class="p">,</span> <span class="mi">35</span><span class="p">]</span>
+    <span class="n">colormap</span><span class="p">[</span><span class="mi">9</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">152</span><span class="p">,</span> <span class="mi">251</span><span class="p">,</span> <span class="mi">152</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">colormap</span>
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">'__main__'</span><span class="p">:</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="s">'cuda'</span> <span class="k">if</span> <span class="n">torch</span><span class="p">.</span><span class="n">cuda</span><span class="p">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s">'cpu'</span>
+    <span class="k">print</span><span class="p">(</span><span class="sa">f</span><span class="s">"= Using device </span><span class="si">{</span><span class="n">device</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+    <span class="n">emb_size</span> <span class="o">=</span> <span class="mi">32</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">SimpleMetricEmbedding</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">emb_size</span><span class="p">).</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="c1"># YOUR CODE HERE
+</span>    <span class="c1"># LOAD TRAINED PARAMS
+</span>
+    <span class="n">colormap</span> <span class="o">=</span> <span class="n">get_colormap</span><span class="p">()</span>
+    <span class="n">mnist_download_root</span> <span class="o">=</span> <span class="s">"./mnist/"</span>
+    <span class="n">ds_test</span> <span class="o">=</span> <span class="n">MNISTMetricDataset</span><span class="p">(</span><span class="n">mnist_download_root</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s">'test'</span><span class="p">)</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">ds_test</span><span class="p">.</span><span class="n">images</span>
+    <span class="n">Y</span> <span class="o">=</span> <span class="n">ds_test</span><span class="p">.</span><span class="n">targets</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">"Fitting PCA directly from images..."</span><span class="p">)</span>
+    <span class="n">test_img_rep2d</span> <span class="o">=</span> <span class="n">torch</span><span class="p">.</span><span class="n">pca_lowrank</span><span class="p">(</span><span class="n">ds_test</span><span class="p">.</span><span class="n">images</span><span class="p">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">28</span> <span class="o">*</span> <span class="mi">28</span><span class="p">),</span> <span class="mi">2</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">plt</span><span class="p">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">test_img_rep2d</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">test_img_rep2d</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="n">colormap</span><span class="p">[</span><span class="n">Y</span><span class="p">[:]]</span> <span class="o">/</span> <span class="mf">255.</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">plt</span><span class="p">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="n">plt</span><span class="p">.</span><span class="n">figure</span><span class="p">()</span>
+
+    <span class="k">print</span><span class="p">(</span><span class="s">"Fitting PCA from feature representation"</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="p">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="n">model</span><span class="p">.</span><span class="nb">eval</span><span class="p">()</span>
+        <span class="n">test_rep</span> <span class="o">=</span> <span class="n">model</span><span class="p">.</span><span class="n">get_features</span><span class="p">(</span><span class="n">X</span><span class="p">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">test_rep2d</span> <span class="o">=</span> <span class="n">torch</span><span class="p">.</span><span class="n">pca_lowrank</span><span class="p">(</span><span class="n">test_rep</span><span class="p">,</span> <span class="mi">2</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">plt</span><span class="p">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">test_rep2d</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">test_rep2d</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="n">colormap</span><span class="p">[</span><span class="n">Y</span><span class="p">[:]]</span> <span class="o">/</span> <span class="mf">255.</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+        <span class="n">plt</span><span class="p">.</span><span class="n">show</span><span class="p">()</span>
+</code><div style="font-size:0; opacity:0;">// TODO morsic: Nemoj zaboraviti promijeniti funkcije iz snake case u camel case</div></pre></div></div>
+
+<p>Modificirajte kod tako da učitava parametre naučene u prethodnom zadatku. 
+Više o pohrani i učitavanju parametara možete naći u 
+<a href="https://pytorch.org/tutorials/beginner/saving_loading_models.html">dokumentaciji pytorcha</a>. 
+Vizualizirajte primjere u prostoru slike
+te u prostoru značajki 
+za model koji je učen sa svim znamenkama i 
+za model koji prilikom učenja 
+nije vidio slike sa znamenkom 0.</p>
+
+</div>
+
+<footer id="footer">
+
+  <p>
+  Ove stranice sastavljaju Petra Bevandić,
+  Marin Oršić, Ivan Grubišić, Josip Šarić
+  i Siniša Šegvić.
+  </p>
+
+  <p>
+  Prva verzija ovih stranica bila je rezultat istraživačkog projekta 
+  <a href="http://multiclod.zemris.fer.hr">MULTICLOD</a> (I-2433-2014) Hrvatske zaklade za znanost.
+  </p>
+
+  <p>
+  Izrađeno
+  <a href="http://www.vim.org/">
+  vi
+  </a>
+  -jem i
+  <a href="http://www.gedit.org/">
+  gedit
+  </a>
+  om.
+  </p>
+
+
+  <p>
+  Svi komentari su dobrodošli:
+  <span>
+    <img alt="dubuce1 at fer hr" src="email.png" style="height: 0.9rem; display: inline; margin: 0; border: 0;"/>
+  </span>
+
+    <div style="float: left;">Posljednja promjena: 02-Mar-2026 18:35 CET</div>
+    <div style="float: right;"><a href="https://www.zemris.fer.hr/predmeti/du1/">Povratak</a></div>
+  </p>
+  </footer>
+
+    </body>
+<script>hljs.highlightAll();</script> 
+</html>
