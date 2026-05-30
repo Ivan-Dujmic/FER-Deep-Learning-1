@@ -15,3 +15,7 @@
 - Text data loading
 - Recurrent neural networks (RNN, GRU, LSTM)
 - Case study: SST
+
+## Lab4
+- Metric embeddings
+- Case study: MNIST
