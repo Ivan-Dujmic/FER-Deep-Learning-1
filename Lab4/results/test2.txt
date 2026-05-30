@@ -1,0 +1,3 @@
+Evaluating on validation set...
+Valid Accuracy: 81.36%
+Time (sec): 86.0

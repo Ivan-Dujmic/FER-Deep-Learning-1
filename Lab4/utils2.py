@@ -2,24 +2,6 @@ import numpy as np
 import torch
 from collections import defaultdict
 
-PRINT_LOSS_N = 100
-
-
-def train(model, optimizer, loader, device='cuda'):
-    losses = []
-    model.train()
-    for i, data in enumerate(loader):
-        anchor, positive, negative, _ = data
-        optimizer.zero_grad()
-        loss = model.loss(anchor.to(device), positive.to(device), negative.to(device))
-        loss.backward()
-        optimizer.step()
-        losses.append(loss.cpu().item())
-        if i % PRINT_LOSS_N == 0:
-            print(f"Iter: {i}, Mean Loss: {np.mean(losses):.3f}")
-    torch.save(model.state_dict(), "model.pt")
-    return np.mean(losses)
-
 
 def compute_representations(model, loader, identities_count, emb_size=32, device='cuda'):
     model.eval()

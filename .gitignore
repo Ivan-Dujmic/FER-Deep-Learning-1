@@ -3,6 +3,7 @@ __pycache__/
 build/
 datasets/
 out/
+mnist/
 
 *copy*
 
