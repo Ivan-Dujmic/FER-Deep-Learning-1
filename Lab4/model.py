@@ -10,6 +10,7 @@ class _BNReluConv(nn.Sequential):
         self.append(nn.ReLU())
         self.append(nn.Conv2d(num_maps_in, num_maps_out, k, bias=bias))
 
+
 class SimpleMetricEmbedding(nn.Module):
     def __init__(self, input_channels, emb_size=32):
         super().__init__()

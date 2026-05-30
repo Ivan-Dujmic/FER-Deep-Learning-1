@@ -19,13 +19,20 @@ class MNISTMetricDataset(Dataset):
             self.target2indices[self.targets[i].item()] += [i]
 
     def _sample_negative(self, index):
-        r1 = choice(range(9))
-        if r1 >= index:
-            r1 += 1
-        return choice(self.target2indices[r1])
+        anchor_class = self.targets[index].item()
+        r = choice(range(9))
+        if r >= anchor_class: # Don't choose something in anchor_class
+            r += 1
+        return choice(self.target2indices[r])
 
     def _sample_positive(self, index):
-        return choice(self.target2indices[index])
+        anchor_class = self.targets[index].item()
+        positive = choice(self.target2indices[anchor_class])
+
+        while positive == index: # Until we choose something different from index
+            positive = choice(self.target2indices[anchor_class])
+
+        return positive
 
     def __getitem__(self, index):
         anchor = self.images[index].unsqueeze(0)
