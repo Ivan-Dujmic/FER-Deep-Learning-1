@@ -17,7 +17,7 @@ def train(model, optimizer, loader, device='cuda'):
         losses.append(loss.cpu().item())
         if i % PRINT_LOSS_N == 0:
             print(f"Iter: {i}, Mean Loss: {np.mean(losses):.3f}")
-    torch.save(model.state_dict(), "model.pt")
+    torch.save(model.state_dict(), "saved/model.pt")
     return np.mean(losses)
 
 

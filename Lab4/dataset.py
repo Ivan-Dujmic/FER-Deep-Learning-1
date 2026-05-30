@@ -1,3 +1,4 @@
+import torch
 from torch.utils.data import Dataset
 from collections import defaultdict
 from random import choice
@@ -5,14 +6,23 @@ import torchvision
 
 
 class MNISTMetricDataset(Dataset):
-    def __init__(self, root="/tmp/mnist/", split='train'):
+    def __init__(self, root="/tmp/mnist/", split='train', remove_classes=None):
         super().__init__()
         assert split in ['train', 'test', 'traineval']
         self.root = root
         self.split = split
+        self.remove_classes = remove_classes or []
         mnist_ds = torchvision.datasets.MNIST(self.root, train='train' in split, download=True)
         self.images, self.targets = mnist_ds.data.float() / 255., mnist_ds.targets
         self.classes = list(range(10))
+
+        if self.remove_classes:
+            mask = torch.ones_like(self.targets, dtype=torch.bool)
+            for c in self.remove_classes:
+                mask &= self.targets != c
+            self.images = self.images[mask]
+            self.targets = self.targets[mask]
+            self.classes = [c for c in self.classes if c not in self.remove_classes]
 
         self.target2indices = defaultdict(list)
         for i in range(len(self.images)):
@@ -20,9 +30,7 @@ class MNISTMetricDataset(Dataset):
 
     def _sample_negative(self, index):
         anchor_class = self.targets[index].item()
-        r = choice(range(9))
-        if r >= anchor_class: # Don't choose something in anchor_class
-            r += 1
+        r = choice([c for c in self.classes if c != anchor_class])
         return choice(self.target2indices[r])
 
     def _sample_positive(self, index):
