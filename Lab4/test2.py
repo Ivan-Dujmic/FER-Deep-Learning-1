@@ -19,13 +19,13 @@ if __name__ == '__main__':
 
     print(f"> Loaded {len(ds_test)} validation images!")
 
-    # test_loader = DataLoader(
-    #     ds_test,
-    #     batch_size=1,
-    #     shuffle=False,
-    #     pin_memory=True,
-    #     num_workers=1
-    # )
+    test_loader = DataLoader(
+        ds_test,
+        batch_size=1,
+        shuffle=False,
+        pin_memory=True,
+        num_workers=1
+    )
 
     traineval_loader = DataLoader(
         ds_traineval,
@@ -41,9 +41,9 @@ if __name__ == '__main__':
     t0 = time.time_ns()
 
     representations = compute_representations(model, traineval_loader, num_classes, emb_size, device)
-    print("Evaluating on validation set...")
-    acc = evaluate(model, representations, traineval_loader, device)
-    print(f"Valid Accuracy: {acc * 100:.2f}%")
+    print("Evaluating on test set...")
+    acc = evaluate(model, representations, test_loader, device)
+    print(f"Test Accuracy: {acc * 100:.2f}%")
 
     t1 = time.time_ns()
     print(f"Time (sec): {(t1-t0)/10**9:.1f}")
